@@ -1,0 +1,19 @@
+# .gitignore para Django
+
+# Archivos de sistema y compilados
+__pycache__/
+*.pyc
+*.pyo
+
+# Entorno Virtual (¡Nunca subir esto!)
+venv/
+env/
+
+# Base de datos local (Opcional, mejor no subirla si usas SQLite local)
+db.sqlite3
+
+# Variables de entorno (Claves secretas)
+.env
+
+# Archivos media (Fotos subidas por usuarios - pesan mucho)
+media/
