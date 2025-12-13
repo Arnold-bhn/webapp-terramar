@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -18,12 +20,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
+env = environ.Env()
+env_file = BASE_DIR / '.env'
+
+if env_file.exists():
+    environ.Env.read_env(str(env_file))
+else:
+    print(f"⚠️  ALERTA: No encuentro el archivo en: {env_file}")
+    print("⚠️  Verifica que el archivo se llame '.env' y no '.env.txt'")
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#@9wz1g+g&cmt%-_hucl97oit$f$y*m8&_q*%b0_ry!t3g4!k('
-
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-clave-de-respaldo-para-desarrollo')
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool('DEBUG', default = False)
 
 ALLOWED_HOSTS = []
 
@@ -63,7 +72,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -71,6 +80,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.informacion_marca',
+                'pedidos.context_processors.carrito_actual',
             ],
         },
     },
@@ -135,10 +146,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # --- CONFIGURACIÓN DE JAZZMIN (ADMIN PANEL) ---
 
 JAZZMIN_SETTINGS = {
-    "site_title": "Terramar Admin",
-    "site_header": "Terramar",
-    "site_brand": "Terramar ERP",
-    "welcome_sign": "Bienvenido al Panel de Gestión",
+    # Usamos default=... para que si falta el .env, no explote
+    "site_title": env('ADMIN_HEADER', default='Terramar Admin'),
+    "site_header": env('PROJECT_NAME', default='Terramar ERP'),
+    "site_brand": env('PROJECT_NAME', default='Terramar ERP'),
+    "welcome_sign": f"Bienvenido a {env('PROJECT_NAME', default='Terramar')}",
     "copyright": "Terramar Ltd",
     "search_model": "core.Cliente", # Nota: Funcionará cuando crees el modelo Cliente
     
@@ -168,6 +180,9 @@ JAZZMIN_SETTINGS = {
         "core.PerfilEmpleado": "fas fa-user-tie",
         "core.Cliente": "fas fa-users",
         "auth.User": "fas fa-key",
+
+        # Pedidos
+        "pedidos.Pedido": "fas fa-cash-register",
     },
 }
 
@@ -254,4 +269,14 @@ ADMIN_REORDER = (
     
     # GRUPO 5: Administración Técnica (Opcional, para ti)
     # Si tienes otras apps como 'pedidos', agrégalas en otro grupo cuando las crees.
+
+    {
+        'app': 'pedidos', 
+        'label': '💰 Gestión de Ventas', 
+        'models': (
+            'pedidos.Pedido',
+            # 'pedidos.DetallePedido', # Opcional: Descomenta si quieres ver los platos sueltos
+        )
+    },
+
 )

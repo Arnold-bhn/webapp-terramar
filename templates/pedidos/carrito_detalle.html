@@ -1,0 +1,361 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<style>
+    .img-agotada {
+        filter: grayscale(100%);
+        opacity: 0.6;
+    }
+    .row-agotada {
+        background-color: #f8f9fa !important; /* Fondo gris claro */
+        opacity: 0.7;
+    }
+    .text-agotado {
+        text-decoration: line-through;
+        color: #999;
+    }
+</style>
+
+<div class="container">
+    <div class="d-flex align-items-center mb-4 mt-4">
+        <h2 class="text-secondary mb-0 me-3">🛒 Tu Carrito</h2>
+        <span id="badge-total-items" class="badge bg-secondary rounded-pill">{{ carrito|length }} items</span>
+    </div>
+
+    {% if carrito|length > 0 %}
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-secondary small text-uppercase">
+                                <tr>
+                                    <th class="ps-4">Plato</th>
+                                    <th class="text-center">Cant.</th>
+                                    <th class="text-end">Precio</th>
+                                    <th class="text-end pe-4">Subtotal</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in carrito.iterar_detalles %}
+                                    <tr id="row-{{ item.producto.id }}" class="item-row {% if not item.producto.esta_disponible %}row-agotada{% endif %}">
+                                        
+                                        <td class="ps-4 py-3">
+                                            <div class="d-flex align-items-center">
+                                                {% if item.producto.imagen %}
+                                                    <img src="{{ item.producto.imagen.url }}" 
+                                                         class="rounded me-3 {% if not item.producto.esta_disponible %}img-agotada{% endif %}" 
+                                                         style="width: 50px; height: 50px; object-fit: cover;">
+                                                {% else %}
+                                                    <div class="rounded me-3 bg-secondary d-flex align-items-center justify-content-center text-white {% if not item.producto.esta_disponible %}img-agotada{% endif %}" 
+                                                         style="width: 50px; height: 50px;">
+                                                        <i class="fas fa-utensils"></i>
+                                                    </div>
+                                                {% endif %}
+                                                
+                                                <div>
+                                                    <strong class="text-dark">
+                                                        {{ item.producto.plato.nombre }}
+                                                        {% if not item.producto.esta_disponible %}
+                                                            <span class="badge bg-danger ms-1" style="font-size: 0.6em;">AGOTADO</span>
+                                                        {% endif %}
+                                                    </strong><br>
+                                                    <small class="text-muted">{{ item.producto.nombre }}</small>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td class="text-center">
+                                            <div class="btn-group shadow-sm" role="group">
+                                                <button 
+                                                    class="btn btn-outline-secondary btn-sm btn-update" 
+                                                    data-action="restar" 
+                                                    data-id="{{ item.producto.id }}"
+                                                    data-url="{% url 'restar_plato' item.producto.id %}">
+                                                    <i class="fas fa-minus small"></i>
+                                                </button>
+                                                
+                                                <span id="qty-{{ item.producto.id }}" class="btn btn-light btn-sm disabled text-dark fw-bold border" style="width: 40px;">
+                                                    {{ item.cantidad }}
+                                                </span>
+                                                
+                                                <button 
+                                                    class="btn btn-outline-secondary btn-sm btn-update" 
+                                                    data-action="sumar" 
+                                                    data-id="{{ item.producto.id }}"
+                                                    data-url="{% url 'sumar_plato' item.producto.id %}"
+                                                    {% if not item.producto.esta_disponible %}disabled{% endif %}>
+                                                    <i class="fas fa-plus small"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+
+                                        <td class="text-end text-muted">S/ {{ item.producto.precio }}</td>
+                                        
+                                        <td class="text-end fw-bold text-dark pe-4">
+                                            S/ <span id="subtotal-{{ item.producto.id }}">{{ item.subtotal }}</span>
+                                        </td>
+                                        
+                                        <td class="text-end pe-3">
+                                            
+                                            <a href="#" 
+                                            class="btn btn-outline-danger btn-sm btn-eliminar" 
+                                            data-url="{% url 'eliminar_carrito' item.producto.id %}" 
+                                            data-id="{{ item.producto.id }}"
+                                            
+                                            data-agotado="{% if not item.producto.esta_disponible %}true{% else %}false{% endif %}"
+                                            >
+                                            
+                                            <i class="fas fa-trash-alt"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between mt-3">
+                    <a href="{% url 'menu' %}" class="btn btn-outline-dark">
+                        <i class="fas fa-arrow-left me-2"></i> Seguir pidiendo
+                    </a>
+                    <a href="{% url 'limpiar_carrito' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-broom me-1"></i> Vaciar todo
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 bg-light">
+                    <div class="card-body p-4">
+                        <h4 class="card-title text-secondary">Resumen</h4>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-4 align-items-center">
+                            <span class="h5 mb-0">Total a Pagar:</span>
+                            <span class="h3 fw-bold text-success mb-0">
+                                S/ <span id="total-global">{{ carrito.get_total_precio }}</span>
+                            </span>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <div id="alerta-agotados" class="alert alert-danger text-center mb-2 py-2 small border-danger" role="alert" 
+                                {% if not hay_agotados %}style="display: none;"{% endif %}>
+                                <i class="fas fa-exclamation-triangle me-1"></i> 
+                                <strong>¡Atención!</strong> Elimina los items agotados para continuar.
+                            </div>
+                            
+                            <div id="btn-pagar-wrapper">
+                                {% if hay_agotados %}
+                                    <button class="btn btn-secondary btn-lg py-3 fw-bold disabled" disabled style="cursor: not-allowed; width: 100%;">
+                                        PAGAR AHORA <i class="fas fa-lock ms-2"></i>
+                                    </button>
+                                {% else %}
+                                    <a href="#" class="btn btn-success btn-lg py-3 shadow-sm fw-bold" style="width: 100%;">
+                                        PAGAR AHORA <i class="fas fa-chevron-right ms-2"></i>
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-3">
+                            <small class="text-muted d-block mb-2">
+                                <i class="fas fa-lock text-success me-1"></i> Transacción 100% Segura
+                            </small>
+                            <div class="d-flex justify-content-center align-items-center bg-light rounded-pill py-2 px-3 mx-auto" style="width: fit-content; gap: 15px;">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Yape_text_app_icon.png/320px-Yape_text_app_icon.png" alt="Yape" style="height: 18px; width: auto;" title="Yape">
+                                <img src="https://plin.pe/wp-content/themes/plin/favicon/apple-icon-57x57.png" alt="Plin" style="height: 18px; width: auto;" title="Plin">
+                                <i class="fab fa-cc-visa fa-1x" style="color: #1a1f71;" title="Visa"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <h3 class="fw-light">Tu carrito está vacío 😢</h3>
+            <p class="text-muted">Parece que aún no has elegido nada delicioso.</p>
+            <a href="{% url 'menu' %}" class="btn btn-primary btn-lg mt-3 px-5 rounded-pill">
+                Ir al Menú
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ==========================================
+    // 1. MANEJO DE SUMAR Y RESTAR (+ / -)
+    // ==========================================
+    const botonesUpdate = document.querySelectorAll('.btn-update');
+    botonesUpdate.forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            procesarPeticion(this);
+        });
+    });
+
+    // ==========================================
+    // 2. MANEJO DE ELIMINAR (Bote de basura)
+    // ==========================================
+    const botonesEliminar = document.querySelectorAll('.btn-eliminar');
+    botonesEliminar.forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            const botonActual = this;
+            
+            // Leemos si está marcado como agotado desde el HTML
+            const esAgotado = botonActual.getAttribute('data-agotado') === 'true';
+
+            if (esAgotado) {
+                // CASO A: SI ESTÁ AGOTADO -> Eliminar directo (sin preguntar)
+                procesarPeticion(botonActual);
+            } else {
+                // CASO B: SI ESTÁ DISPONIBLE -> Preguntar "¿Estás seguro?"
+                Swal.fire({
+                    title: '¿Eliminar producto?',
+                    text: "Se quitará este plato de tu carrito",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        procesarPeticion(botonActual);
+                    }
+                });
+            }
+        });
+    });
+    // ==========================================
+    // 3. FUNCIÓN MAESTRA DE PETICIÓN
+    // ==========================================
+    function procesarPeticion(btnElement) {
+        btnElement.disabled = true; 
+        
+        // Obtenemos datos
+        const url = btnElement.getAttribute('data-url');
+        const productId = btnElement.getAttribute('data-id');
+
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error("Error de red");
+            return response.json();
+        })
+        .then(data => {
+            // CASO A: Éxito (se sumó, restó o eliminó correctamente)
+            if (data.status === 'ok') {
+                actualizarUI(data, productId);
+            }
+            // CASO B: Error (Stock insuficiente al intentar sumar)
+            else if (data.status === 'error') {
+                Swal.fire({
+                    icon: 'error',
+                    title: '¡Ups!',
+                    text: data.message, // "No hay suficiente stock..."
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de conexión',
+                text: 'Por favor intenta recargar la página'
+            });
+        })
+        .finally(() => {
+            // Rehabilitamos botón si aún existe en el DOM
+            if(document.body.contains(btnElement)) {
+                btnElement.disabled = false;
+            }
+        });
+    }
+
+    // ==========================================
+    //  // 4. ACTUALIZACIÓN DE LA INTERFAZ (UI)
+    // ==========================================
+    function actualizarUI(data, productId) {
+        // A. Actualizar Totales Globales
+        const badgeItems = document.getElementById('badge-total-items');
+        const cartCountNav = document.getElementById('cart-count');
+        const totalGlobal = document.getElementById('total-global');
+
+        if(badgeItems) badgeItems.innerText = data.total_items + ' items';
+        if(cartCountNav) cartCountNav.innerText = data.total_items;
+        if(totalGlobal) totalGlobal.innerText = parseFloat(data.total_global).toFixed(2);
+
+        // B. Si hay que eliminar la fila visualmente
+        if (data.eliminado) {
+            const row = document.getElementById(`row-${productId}`);
+            if (row) {
+                row.style.transition = "all 0.4s ease-out";
+                row.style.transform = "translateX(20px)";
+                row.style.opacity = "0";
+                
+                setTimeout(() => {
+                    row.remove();
+                    // Si el carrito queda vacío, recargamos
+                    if (data.total_items === 0) {
+                        location.reload();
+                    }
+                }, 400);
+            }
+        } else {
+            // C. Si es solo actualización de cantidad
+            const qtySpan = document.getElementById(`qty-${productId}`);
+            const subtotalSpan = document.getElementById(`subtotal-${productId}`);
+            
+            if (qtySpan) qtySpan.innerText = data.cantidad;
+            if (subtotalSpan) subtotalSpan.innerText = parseFloat(data.subtotal).toFixed(2);
+        }
+
+        // --- D. GESTIÓN DEL BOTÓN DE PAGO (¡ESTO ES LO NUEVO!) ---
+        // Verificamos si el servidor nos envió el estado de 'agotados'
+        if (typeof data.hay_agotados !== 'undefined') {
+            const alerta = document.getElementById('alerta-agotados');
+            const btnWrapper = document.getElementById('btn-pagar-wrapper');
+
+            if (data.hay_agotados === false) {
+                // CASO 1: YA NO HAY AGOTADOS -> DESBLOQUEAR TODO
+                if (alerta) alerta.style.display = 'none'; // Ocultar alerta roja
+                
+                if (btnWrapper) {
+                    btnWrapper.innerHTML = `
+                        <a href="#" class="btn btn-success btn-lg py-3 shadow-sm fw-bold" style="width: 100%;">
+                            PAGAR AHORA <i class="fas fa-chevron-right ms-2"></i>
+                        </a>
+                    `;
+                }
+            } else {
+                // CASO 2: AÚN QUEDAN AGOTADOS -> MANTENER BLOQUEADO
+                if (alerta) alerta.style.display = 'block'; // Mostrar alerta roja
+                
+                if (btnWrapper) {
+                    btnWrapper.innerHTML = `
+                        <button class="btn btn-secondary btn-lg py-3 fw-bold disabled" disabled style="cursor: not-allowed; width: 100%;">
+                            PAGAR AHORA <i class="fas fa-lock ms-2"></i>
+                        </button>
+                    `;
+                }
+            }
+        }
+    }
+
+});
+</script>
+
+{% endblock %}

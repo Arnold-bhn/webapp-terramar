@@ -5,10 +5,10 @@ from .models import Marca, ConfiguracionVisual, Sede, Mesa, PerfilEmpleado, Clie
 
 # Configuración de Textos del Panel
 # 1. Configuración General del Panel
-admin.site.site_header = "Terramar Admin"
-admin.site.site_title = "Portal de Gestión"
-admin.site.index_title = "Panel de Control"
-admin.site.unregister(Group) # Opcional: Para limpiar la vista
+#admin.site.site_header = "Terramar Admin"
+#admin.site.site_title = "Portal de Gestión"
+#admin.site.index_title = "Panel de Control"
+#admin.site.unregister(Group) # Opcional: Para limpiar la vista
 # NOTA: Cambiamos 'ModelAdmin' (de Unfold) por 'admin.ModelAdmin' (Estándar)
 
 # 2. Integración de Usuarios (Ver Empleado/Cliente dentro del Usuario)
@@ -61,3 +61,8 @@ class MesaAdmin(admin.ModelAdmin):
     list_filter = ('sede', 'estado')
     search_fields = ('numero',)
     #list_editable = ('estado',)
+
+@admin.register(Cliente)
+class ClienteAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'dni', 'telefono', 'nivel')
+    search_fields = ('dni', 'usuario__username')
