@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from .carrito import Carrito
 from catalogo.models import Variante # IMPORTANTE: Importamos desde catalogo
+from django.contrib.admin.views.decorators import staff_member_required
 
 # --- VISTA DEL CARRITO ---
 def ver_carrito(request):
@@ -143,3 +144,14 @@ def limpiar_carrito(request):
     carrito = Carrito(request)
     carrito.limpiar()
     return redirect('menu')
+
+
+@staff_member_required # Solo administradores pueden usar esto
+def toggle_variante_status(request, variante_id):
+    variante = get_object_or_404(Variante, id=variante_id)
+    # Invertimos el estado: Si es True pasa a False, y viceversa
+    variante.activo = not variante.activo 
+    variante.save()
+    
+    # Nos devuelve a la página anterior (la lista del admin)
+    return redirect(request.META.get('HTTP_REFERER', 'admin:index'))

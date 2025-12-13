@@ -16,6 +16,12 @@ class InsumoCritico(models.Model):
 class Categoria(models.Model):
     marca = models.ForeignKey(Marca, on_delete=models.CASCADE, related_name='categorias')
     nombre = models.CharField(max_length=50)
+    nombre_singular = models.CharField(
+        max_length=50, 
+        blank=True, 
+        null=True, 
+        help_text="Ej: 'Chicharron' (para que salga 'Chicharron de Pollo')"
+    )
     #imagen = models.ImageField(upload_to='categorias/', blank=True, null=True)
     orden = models.IntegerField(default=0, help_text="1 sale primero, 2 después ...")
     activo = models.BooleanField(default=True)
@@ -34,9 +40,20 @@ class Plato(models.Model):
     activo_manual = models.BooleanField(default=True, help_text="Apagar este plato manualmente")
     # Si se acaba el 'Insumo Crítico', el plato se apaga solo
     insumos_clave = models.ManyToManyField(InsumoCritico, blank=True)
-
+    orden = models.IntegerField(default=0, help_text="1 sale primero, 2 después...")
+    # --- CONFIGURACIÓN DE ORDENAMIENTO ---
+    class Meta:
+        # Ordena primero por 'orden' (ascendente) y luego por 'nombre' (si tienen el mismo número)
+        ordering = ['orden', 'nombre']
     def __str__(self):
-        return self.nombre
+        # 1. Intentamos usar el singular (si el admin lo escribió)
+        if self.categoria.nombre_singular:
+            prefijo = self.categoria.nombre_singular
+        else:
+            # 2. Si no, usamos el plural por defecto
+            prefijo = self.categoria.nombre
+            
+        return f"{prefijo} de {self.nombre}"
     
     # --- AQUÍ ESTÁ LA MAGIA (El Portero) ---
     @property
@@ -65,11 +82,23 @@ class Variante(models.Model):
     nombre = models.CharField(max_length=50, default="Estándar", help_text="Ej: Personal, Fuente, Vaso")
     precio = models.DecimalField(max_digits=10, decimal_places=2)
     
+    # --- NUEVO CAMPO: Interruptor individual ---
+    activo = models.BooleanField(default=True, verbose_name="¿Disponible?", help_text="Desmarcar si se agotó solo esta presentación")
+    
     def __str__(self):
         return f"{self.plato.nombre} - {self.nombre} (S/ {self.precio})"
 
-    # --- AGREGA ESTO ---
+    # --- LÓGICA DE DISPONIBILIDAD ACTUALIZADA ---
     @property
     def esta_disponible(self):
-        # La variante está disponible SOLO SI el plato padre está disponible
+        """
+        La variante está disponible SI:
+        1. Ella misma está activa (activo=True).
+        2. Y SU PAPÁ (El Plato) también está disponible (tiene insumos y está activo).
+        """
+        # 1. Chequeo individual (¿Queda fuente familiar?)
+        if not self.activo:
+            return False
+            
+        # 2. Chequeo del padre (¿Queda pescado para cocinar?)
         return self.plato.esta_disponible
