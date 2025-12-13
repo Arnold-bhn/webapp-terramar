@@ -155,3 +155,5 @@ def toggle_variante_status(request, variante_id):
     
     # Nos devuelve a la página anterior (la lista del admin)
     return redirect(request.META.get('HTTP_REFERER', 'admin:index'))
+
+#Actualizar VErsion
