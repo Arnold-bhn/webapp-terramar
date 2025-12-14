@@ -4,223 +4,218 @@
 {% block content %}
 
     <style>
-        .img-agotada {
-            filter: grayscale(100%);
-            opacity: 0.6;
-            transition: all 0.3s ease;
+        .img-agotada { filter: grayscale(100%); opacity: 0.6; transition: all 0.3s ease; }
+        .btn-agotado { cursor: not-allowed !important; background-color: #6c757d; border-color: #6c757d; color: white; }
+        
+        /* ESTILOS BOTONES DE MARCA */
+        .btn-marca-custom {
+            cursor: pointer;
+            color: #6c757d;
+            font-weight: bold;
+            border: 1px solid #dee2e6;
+            margin: 0 5px;
+            border-radius: 50rem;
+            background: white;
+            padding: 8px 16px;
+            transition: background-color 0.2s, color 0.2s;
         }
-        /* Opcional: Para que el botón agotado se vea bien claro */
-        .btn-agotado {
-            cursor: not-allowed !important;
-            background-color: #6c757d;
-            border-color: #6c757d;
-            color: white;
+
+        .btn-marca-custom.activo {
+            background-color: #0d6efd !important;
+            color: white !important;
+            border-color: #0d6efd !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .btn-marca-custom:hover:not(.activo) {
+            background-color: #f8f9fa;
+        }
+
+        .marcas-sticky-panel {
+            position: sticky; 
+            top: 50px; 
+            z-index: 1040; 
+            background-color: #f8f9fa; 
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
+            padding: 10px 0;
+        }
+        
+        .contenido-menu-wrapper {
+            min-height: 400px; /* Evita saltos bruscos si carga lento */
         }
     </style>
 
-    <div class="text-center mb-5 mt-4">
+    <div class="text-center mb-4 mt-4" style="margin-top: 70px !important;"> 
         <h1 class="display-6 fw-bold text-secondary">Nuestra Carta</h1>
         <p class="text-muted">Selecciona tus platos favoritos</p>
     </div>
 
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-        <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">
-                    <i class="fas fa-check-circle me-2"></i> ¡Agregado al pedido!
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
+    <div class="container marcas-sticky-panel"> 
+        <div class="d-flex justify-content-center flex-wrap">
+            {% for m in todas_marcas %}
+                <button type="button" 
+                        class="btn-marca-custom {% if marca_actual and m.id == marca_actual.id %}activo{% endif %}"
+                        id="btn-marca-{{ m.slug }}"
+                        onclick="cargarMarca(event, '{{ m.slug }}')">
+                    {{ m.nombre|upper }}
+                </button>
+            {% endfor %}
         </div>
     </div>
 
-    {% for categoria in categorias %}
-        {% if categoria.platos.exists %}
-            <div class="mb-5">
-                <h3 class="border-bottom pb-2 mb-4 text-marca">{{ categoria.nombre }}</h3>
-                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-                    
-                    {% for plato in categoria.platos.all %}
-                        <div class="col">
-                            <div class="card h-100 shadow-sm {% if not plato.esta_disponible %}border-0 bg-light{% else %}border-0{% endif %}">
-                                
-                                {% if plato.imagen %}
-                                    <img src="{{ plato.imagen.url }}" 
-                                         class="card-img-top {% if not plato.esta_disponible %}img-agotada{% endif %}" 
-                                         alt="{{ plato.nombre }}">
-                                {% else %}
-                                    <div class="bg-secondary text-white d-flex align-items-center justify-content-center {% if not plato.esta_disponible %}img-agotada{% endif %}" 
-                                         style="height: 200px;">
-                                        <i class="fas fa-camera fa-3x"></i>
-                                    </div>
-                                {% endif %}
-
-                                <div class="card-body">
-                                    <h5 class="card-title fw-bold {% if not plato.esta_disponible %}text-muted{% endif %}">
-                                        {{ plato.nombre }}
-                                        {% if not plato.esta_disponible %}
-                                            <span class="badge bg-secondary ms-1" style="font-size: 0.6em;">AGOTADO</span>
-                                        {% endif %}
-                                    </h5>
-                                    
-                                    <p class="card-text text-muted small">{{ plato.descripcion|truncatechars:60 }}</p>
-                                    
-                                    <div class="mt-3">
-                                        {% for variante in plato.variantes.all %}
-                                            
-                                            {% with disponible=variante.esta_disponible %}
-
-                                            <form action="{% url 'agregar_carrito' variante.id %}" method="POST" class="d-flex justify-content-between align-items-center mb-2 form-ajax">
-                                                {% csrf_token %}
-                                                
-                                                <small class="fw-bold {% if not disponible %}text-muted text-decoration-line-through{% else %}text-dark{% endif %}">
-                                                    {{ variante.nombre }} - S/ {{ variante.precio }}
-                                                </small>
-                                                
-                                                <div class="d-flex align-items-center">
-                                                    
-                                                    {% if disponible %}
-                                                        {% with cantidad=carrito|cantidad_en_carrito:variante.id %}
-                                                            <span id="badge-{{ variante.id }}" 
-                                                                class="badge bg-dark me-2 rounded-pill {% if cantidad == 0 %}d-none{% endif %}">
-                                                                {{ cantidad }}
-                                                            </span>
-                                                        {% endwith %}
-                                                    {% endif %}
-
-                                                    {% if disponible %}
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill btn-agregar">
-                                                            Agregar <i class="fas fa-plus ms-1"></i>
-                                                        </button>
-                                                    {% else %}
-                                                        <button type="button" class="btn btn-secondary btn-sm rounded-pill btn-agotado" disabled style="cursor: not-allowed; opacity: 0.6;">
-                                                            Agotado <i class="fas fa-ban ms-1"></i>
-                                                        </button>
-                                                    {% endif %}
-                                                    
-                                                </div>
-                                            </form>
-
-                                            {% endwith %}
-                                            
-                                        {% empty %}
-                                            <small class="text-danger">No hay variantes configuradas.</small>
-                                        {% endfor %}
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                        
-                    {% endfor %}
+    <div class="container mb-5 contenido-menu-wrapper" id="platos-container">
+        
+        <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+            <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body"><i class="fas fa-check-circle me-2"></i> ¡Agregado!</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
                 </div>
             </div>
-        {% endif %}
-    {% empty %}
-        <div class="alert alert-info text-center">¡Hola! Aún no hemos cargado platos.</div>
-    {% endfor %}
+        </div>
+
+        {% include 'catalogo/platos_list.html' %} 
+    </div>
 
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        // ==========================================
+        // VARIABLES GLOBALES PARA MEMORIA DE SCROLL
+        // ==========================================
+        
+        // Objeto para guardar posiciones: { 'terramar': 1200, 'a-fuego': 500 }
+        const memoriaScroll = {}; 
+        
+        // Guardamos cuál es la marca actual al cargar la página por primera vez
+        let marcaActualGlobal = "{{ marca_actual.slug|default:'' }}"; 
+
+        // ==========================================
+        // 1. FUNCIÓN DE CARGA CON MEMORIA
+        // ==========================================
+        function cargarMarca(event, slug) {
+            event.preventDefault();
+            
+            // Si ya estamos en esta marca, no hacemos nada
+            if (slug === marcaActualGlobal) return;
+
+            console.log(`Cambiando de ${marcaActualGlobal} a ${slug}`);
+
+            // A. GUARDAR MEMORIA: Antes de irnos, guardamos dónde estamos scrolleados
+            memoriaScroll[marcaActualGlobal] = window.scrollY;
+            
+            // B. ACTUALIZAR REFERENCIA: Ahora la marca actual será la nueva
+            marcaActualGlobal = slug;
+
+            const contenedor = document.getElementById('platos-container');
+            const url = `/ajax/platos/${slug}/`;
+
+            // Efecto visual
+            contenedor.style.opacity = '0.4';
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error('Error servidor');
+                    return response.text();
+                })
+                .then(html => {
+                    // C. CAMBIAR CONTENIDO
+                    contenedor.innerHTML = html;
+
+                    // D. ACTUALIZAR BOTONES
+                    document.querySelectorAll('.btn-marca-custom').forEach(btn => btn.classList.remove('activo'));
+                    const btnActivo = document.getElementById('btn-marca-' + slug);
+                    if(btnActivo) btnActivo.classList.add('activo');
+
+                    // E. REACTIVAR FORMULARIOS
+                    activarFormulariosCarrito();
+
+                    // F. RESTAURAR SCROLL (LA MAGIA)
+                    contenedor.style.opacity = '1';
+
+                    if (memoriaScroll[slug] !== undefined) {
+                        // Si ya habíamos estado aquí, volvemos a esa posición exacta
+                        // Usamos un pequeño timeout para asegurar que el navegador renderizó la altura
+                        setTimeout(() => {
+                            window.scrollTo({
+                                top: memoriaScroll[slug],
+                                behavior: 'auto' // 'auto' es instantáneo, 'smooth' es suave
+                            });
+                        }, 10);
+                    } else {
+                        // Si es la primera vez que entramos a esta marca, vamos al inicio (arriba)
+                        // pero respetando el sticky header (ajustamos a 0 o un poco más abajo si quieres)
+                        window.scrollTo(0, 0);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    contenedor.style.opacity = '1';
+                });
+        }
+
+        // ==========================================
+        // 2. LÓGICA DEL CARRITO (Igual que antes)
+        // ==========================================
+        function activarFormulariosCarrito() {
             const forms = document.querySelectorAll('.form-ajax');
             const toastEl = document.getElementById('liveToast');
-            const toast = new bootstrap.Toast(toastEl);
+            const toast = toastEl ? new bootstrap.Toast(toastEl) : null;
             const cartCounter = document.getElementById('cart-count');
 
             forms.forEach(form => {
-                form.addEventListener('submit', function (e) {
-                    e.preventDefault(); // Detenemos el envío normal
+                if (form.getAttribute('data-listo') === 'si') return;
+                form.setAttribute('data-listo', 'si');
 
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault(); 
                     const url = this.action;
                     const formData = new FormData(this);
                     const btn = this.querySelector('.btn-agregar');
-                    const badge = this.querySelector('span[id^="badge-"]'); // Buscamos el badge dentro del form
-
-                    // 1. Feedback visual inmediato (Cargando...)
-                    btn.disabled = true;
+                    const badge = this.querySelector('span[id^="badge-"]');
                     const originalText = btn.innerHTML;
+
+                    btn.disabled = true;
                     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-                    // 2. Petición AJAX al servidor
                     fetch(url, {
-                        method: 'POST',
-                        body: formData,
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     })
-                    .then(response => response.json())
+                    .then(r => r.json())
                     .then(data => {
-                        
-                        // CASO A: TODO OK (Se agregó al carrito)
                         if (data.status === 'ok') {
-                            // Mostrar Toast
-                            toast.show();
-
-                            // Actualizar Navbar (Carrito Global)
-                            if (cartCounter) {
+                            if(toast) toast.show();
+                            if(cartCounter) {
                                 cartCounter.innerText = data.cant_total;
                                 cartCounter.classList.remove('d-none');
                             }
-
-                            // Actualizar Badge del Plato
-                            if (badge) {
+                            if(badge) {
                                 badge.innerText = data.cant_producto;
                                 badge.classList.remove('d-none');
-                                // Efecto flash verde
                                 badge.classList.add('bg-success');
                                 setTimeout(() => {
                                     badge.classList.remove('bg-success');
                                     badge.classList.add('bg-dark');
-                                }, 300);
+                                }, 500);
                             }
-                            
-                            // Restaurar el botón para seguir comprando
                             btn.disabled = false;
                             btn.innerHTML = originalText;
-                        }
-                        
-                        // CASO B: ERROR DE STOCK (Lógica "Apuestas en Vivo")
-                        // El servidor detectó que se acabó el ingrediente justo al hacer clic
-                        else if (data.status === 'error') {
-                            
-                            // 1. Alerta impactante
-                            Swal.fire({
-                                icon: 'error',
-                                title: '¡Lo sentimos!',
-                                text: data.message, // Mensaje dinámico desde Python
-                                confirmButtonColor: '#6c757d'
-                            });
-
-                            // 2. Transformar el botón a "AGOTADO" permanentemente
-                            // Removemos clases viejas y ponemos las de agotado
-                            btn.className = 'btn btn-secondary btn-sm rounded-pill btn-agotado'; 
-                            btn.disabled = true; // Botón muerto
-                            btn.innerHTML = 'Agotado <i class="fas fa-ban ms-1"></i>';
-                            
-                            // 3. Poner gris la imagen del plato automáticamente
-                            const card = btn.closest('.card');
-                            if (card) {
-                                const img = card.querySelector('img');
-                                const placeholder = card.querySelector('.bg-secondary'); // por si no tiene img
-                                
-                                if(img) img.classList.add('img-agotada');
-                                if(placeholder) placeholder.classList.add('img-agotada');
-                                
-                                // Opcional: Poner gris el título
-                                const title = card.querySelector('.card-title');
-                                if(title) title.classList.add('text-muted');
-                            }
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'Oops...', text: data.message });
+                            btn.innerHTML = 'Agotado';
+                            btn.disabled = true;
                         }
                     })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        // Si es error de red, restauramos para que intente de nuevo
+                    .catch(() => {
                         btn.disabled = false;
                         btn.innerHTML = originalText;
                     });
                 });
             });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            activarFormulariosCarrito();
         });
     </script>
 

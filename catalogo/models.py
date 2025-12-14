@@ -36,7 +36,7 @@ class Plato(models.Model):
     categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE, related_name='platos')
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True, help_text="Descripción para la web")
-    #imagen = models.ImageField(upload_to='platos/', blank=True, null=True)
+    imagen = models.ImageField(upload_to='platos/', blank=True, null=True)
     activo_manual = models.BooleanField(default=True, help_text="Apagar este plato manualmente")
     # Si se acaba el 'Insumo Crítico', el plato se apaga solo
     insumos_clave = models.ManyToManyField(InsumoCritico, blank=True)
@@ -95,10 +95,7 @@ class Variante(models.Model):
         La variante está disponible SI:
         1. Ella misma está activa (activo=True).
         2. Y SU PAPÁ (El Plato) también está disponible (tiene insumos y está activo).
-        """
-        # 1. Chequeo individual (¿Queda fuente familiar?)
-        if not self.activo:
-            return False
-            
+        """          
         # 2. Chequeo del padre (¿Queda pescado para cocinar?)
-        return self.plato.esta_disponible
+        return self.activo and self.plato.esta_disponible
+    

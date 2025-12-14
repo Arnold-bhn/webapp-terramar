@@ -39,49 +39,51 @@ class CategoriaAdmin(admin.ModelAdmin):
 
 @admin.register(Plato)
 class PlatoAdmin(admin.ModelAdmin):
-    # --- AQUÍ FALTABA AGREGAR 'control_variantes' ---
-    list_display = ('nombre_completo', 'categoria','orden', 'activo_manual', 'control_variantes')
+    # 1. AGREGAMOS 'control_variantes' AQUI EN LA LISTA VISIBLE
+    list_display = ('nombre_completo', 'categoria', 'orden', 'activo_manual', 'control_variantes')
+    
     list_filter = ('marca', 'categoria')
-    list_editable = ('orden','activo_manual',)
+    list_editable = ('orden', 'activo_manual')
     search_fields = ('nombre',)
-    inlines = [VarianteInline] 
+    # inlines = [VarianteInline] # Descomenta esto si tienes tu Inline definido arriba
     filter_horizontal = ('insumos_clave',)
 
     @admin.display(description='Plato', ordering='nombre')
     def nombre_completo(self, obj):
-        # Esto llama a tu __str__ del modelo ("Chicharron de Pollo")
         return str(obj)
 
-    # --- MÉTODO CORREGIDO ---
+    # --- AQUÍ ESTÁ TU MÉTODO ARREGLADO ---
     def control_variantes(self, obj):
         html_parts = []
         
         # Recorremos todas las variantes de este plato
         for variante in obj.variantes.all():
-            # Definimos color y texto según estado
             if variante.activo:
-                color = "#198754" # Verde bonito
+                color = "#198754" # Verde (ON)
                 estado = "ON"
+                opacity = "1"
             else:
-                color = "#dc3545" # Rojo alerta
+                color = "#dc3545" # Rojo (OFF)
                 estado = "OFF"
+                opacity = "0.6" # Un poco transparente si está apagado
             
-            # Generamos la URL
+            # Ahora esta línea YA FUNCIONARÁ porque creamos la URL en el Paso 2
             url = reverse('toggle_variante', args=[variante.id])
             
-            # Creamos el botón HTML
             boton = f"""
             <a href="{url}" style="
                 display: inline-block;
-                padding: 3px 6px;
+                padding: 4px 8px;
                 margin: 2px;
                 background-color: {color};
                 color: white;
                 text-decoration: none;
                 border-radius: 4px;
-                font-size: 10px;
+                font-size: 11px;
                 font-weight: bold;
                 border: 1px solid #000;
+                opacity: {opacity};
+                box-shadow: 1px 1px 2px rgba(0,0,0,0.2);
             " title="Clic para cambiar estado">
                 {variante.nombre}: {estado}
             </a>
@@ -91,8 +93,6 @@ class PlatoAdmin(admin.ModelAdmin):
         if not html_parts:
             return "-"
 
-        # --- AQUÍ ESTABA EL ERROR ---
-        # Usamos mark_safe para decirle a Django: "Confía en mí, esto es HTML seguro"
         return mark_safe("".join(html_parts))
     
     control_variantes.short_description = "Variantes (Clic para alternar)"

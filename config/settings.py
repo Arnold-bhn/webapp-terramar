@@ -137,6 +137,12 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# URL pública (lo que escribe el navegador)
+MEDIA_URL = '/media/'
+
+# Ruta física (dónde se guardan en tu PC)
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
