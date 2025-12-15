@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'pedidos',
     'dashboard',
     'admin_reorder',
+    'django.contrib.humanize',
 ]
 
 MIDDLEWARE = [
@@ -286,3 +287,6 @@ ADMIN_REORDER = (
     },
 
 )
+
+
+CART_SESSION_ID = 'carrito'

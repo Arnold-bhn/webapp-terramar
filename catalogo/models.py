@@ -153,3 +153,7 @@ class Variante(models.Model):
     @property
     def esta_disponible(self):
         return self.activo and self.plato.esta_disponible
+    # En catalogo/models.py, dentro de class Variante(...):
+
+    def tiene_opciones(self):
+        return self.grupos_opciones.filter(activo=True).exists()

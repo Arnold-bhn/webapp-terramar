@@ -1,0 +1,118 @@
+{% load humanize %}
+
+<div class="modal-header border-0 pb-0">
+    <h5 class="modal-title fw-bold">{{ variante.nombre }}</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+
+<form method="POST" action="{% url 'agregar_carrito' variante.id %}" id="form-modal-ajax">
+    {% csrf_token %}
+    
+    <input type="hidden" name="variante_id" value="{{ variante.id }}">
+
+    <div class="modal-body">
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="fw-bold text-muted">Precio Base</span>
+            <span class="fw-bold fs-5">S/ {{ variante.precio|floatformat:2|intcomma }}</span>
+        </div>
+        
+        <hr class="my-2">
+
+        {% if grupos %}
+            {% for grupo in grupos %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <label class="fw-bold">{{ grupo.nombre }}</label>
+                        {% if grupo.obligatorio %}
+                            <span class="badge bg-danger bg-opacity-75" style="font-size: 0.65em;">Obligatorio</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-50" style="font-size: 0.65em;">Opcional</span>
+                        {% endif %}
+                    </div>
+
+                    {% for opcion in grupo.opciones.all %}
+                        <div class="form-check">
+                            
+                            {% with precio_extra=opcion.precio_extra|default:0 %}
+                            
+                                {% if grupo.seleccion_multiple %}
+                                    <input class="form-check-input" type="checkbox" 
+                                            name="grupo_{{ grupo.id }}" 
+                                            value="{{ opcion.id }}" 
+                                            id="opt_{{ opcion.id }}"
+                                            data-precio-extra="{{ precio_extra|floatformat:2 }}">
+                                {% else %}
+                                    <input class="form-check-input" type="radio" 
+                                            name="grupo_{{ grupo.id }}" 
+                                            value="{{ opcion.id }}" 
+                                            id="opt_{{ opcion.id }}"
+                                            {% if forloop.first and grupo.obligatorio %}checked{% endif %}
+                                            data-precio-extra="{{ precio_extra|floatformat:2 }}">
+                                {% endif %}
+                            
+                            {% endwith %}
+                            
+                            <label class="form-check-label w-100 d-flex justify-content-between" for="opt_{{ opcion.id }}">
+                                <span>{{ opcion.nombre }}</span>
+                                {% if opcion.precio_extra > 0 %}
+                                    <span class="text-muted small">+ S/ {{ opcion.precio_extra|floatformat:2|intcomma }}</span>
+                                {% endif %}
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-muted text-center small my-3">Sin opciones adicionales configuradas.</p>
+        {% endif %}
+
+        <div class="mt-4">
+            <label class="form-label fw-bold small text-muted">Instrucciones Especiales</label>
+            <textarea name="notas" class="form-control" rows="2" placeholder="Ej: Sin cebolla, cremas aparte..."></textarea>
+        </div>
+    </div>
+
+    <div class="modal-footer border-0 pt-0">
+        <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 fw-bold shadow-sm">
+            AGREGAR AL PEDIDO - S/ <span id="btn-precio-total">{{ variante.precio|floatformat:2|intcomma }}</span>
+        </button>
+    </div>
+</form>
+
+<script>
+    // Valor inicial del precio base de la variante
+    const precioBase = parseFloat("{{ variante.precio|floatformat:2 }}");
+    const spanPrecioTotal = document.getElementById('btn-precio-total');
+    const formModal = document.getElementById('form-modal-ajax');
+    
+    // Función para formatear el número (simula intcomma en JS)
+    const formatPrice = (price) => {
+        return price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); 
+    };
+    
+    // Función principal para calcular y actualizar el precio
+    function actualizarPrecioTotal() {
+        let precioActual = precioBase;
+        
+        // Recorremos solo los inputs marcados (radio y checkbox)
+        formModal.querySelectorAll('input[type="radio"]:checked, input[type="checkbox"]:checked').forEach(input => {
+            
+            // Leemos el precio extra del atributo data-precio-extra
+            const precioExtra = parseFloat(input.getAttribute('data-precio-extra')) || 0;
+            precioActual += precioExtra;
+        });
+
+        // 1. Actualizar el texto del botón (visual)
+        spanPrecioTotal.innerText = formatPrice(precioActual);
+    }
+    
+    // Añadir escuchadores de eventos a todos los inputs
+    formModal.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
+        input.addEventListener('change', actualizarPrecioTotal);
+    });
+
+    // Ejecutar al cargar para mostrar el precio base y cualquier opción pre-seleccionada
+    setTimeout(actualizarPrecioTotal, 0);
+    
+</script>

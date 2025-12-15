@@ -82,7 +82,7 @@ class PlatoAdmin(admin.ModelAdmin):
             
             # Protección por si no existe la URL aún
             try:
-                url = reverse('toggle_variante', args=[variante.id])
+                url = reverse('toggle_variante_status', args=[variante.id]) 
                 href = f'href="{url}"'
             except:
                 href = 'href="#" onclick="return false;"'

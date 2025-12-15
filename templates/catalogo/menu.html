@@ -2,221 +2,296 @@
 {% load cart_tags %} 
 
 {% block content %}
-
     <style>
-        .img-agotada { filter: grayscale(100%); opacity: 0.6; transition: all 0.3s ease; }
-        .btn-agotado { cursor: not-allowed !important; background-color: #6c757d; border-color: #6c757d; color: white; }
+        /* Estilos visuales bonitos */
+        .img-agotada { filter: grayscale(100%); opacity: 0.6; }
         
-        /* ESTILOS BOTONES DE MARCA */
+        .marcas-sticky-panel { 
+            position: sticky; top: 50px; z-index: 1040; 
+            background-color: #f8f9fa; padding: 10px 0; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-bottom: 1px solid #dee2e6;
+        }
+        
         .btn-marca-custom {
-            cursor: pointer;
-            color: #6c757d;
-            font-weight: bold;
-            border: 1px solid #dee2e6;
-            margin: 0 5px;
-            border-radius: 50rem;
-            background: white;
-            padding: 8px 16px;
-            transition: background-color 0.2s, color 0.2s;
+            border-radius: 50rem; margin: 0 5px; border: 1px solid #dee2e6; 
+            background: white; color: #6c757d; font-weight: 600; padding: 8px 18px;
+            transition: all 0.2s ease;
         }
-
         .btn-marca-custom.activo {
-            background-color: #0d6efd !important;
-            color: white !important;
-            border-color: #0d6efd !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background-color: #0d6efd; color: white; border-color: #0d6efd;
+            transform: scale(1.05);
+            box-shadow: 0 2px 5px rgba(13, 110, 253, 0.3);
         }
+        .btn-marca-custom:hover:not(.activo) { background-color: #e9ecef; }
         
-        .btn-marca-custom:hover:not(.activo) {
-            background-color: #f8f9fa;
-        }
-
-        .marcas-sticky-panel {
-            position: sticky; 
-            top: 50px; 
-            z-index: 1040; 
-            background-color: #f8f9fa; 
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
-            padding: 10px 0;
-        }
-        
-        .contenido-menu-wrapper {
-            min-height: 400px; /* Evita saltos bruscos si carga lento */
-        }
+        /* Ajuste para el contenido */
+        #platos-container { min-height: 500px; transition: opacity 0.2s ease; }
     </style>
 
-    <div class="text-center mb-4 mt-4" style="margin-top: 70px !important;"> 
-        <h1 class="display-6 fw-bold text-secondary">Nuestra Carta</h1>
-        <p class="text-muted">Selecciona tus platos favoritos</p>
-    </div>
+    <div id="data-carrito-inicial" data-carrito='
+    {% if carrito_data_json %}
+            {{ carrito_data_json|safe }}
+        {% else %}
+            {}
+        {% endif %}
+    '></div>
 
-    <div class="container marcas-sticky-panel"> 
-        <div class="d-flex justify-content-center flex-wrap">
-            {% for m in todas_marcas %}
-                <button type="button" 
-                        class="btn-marca-custom {% if marca_actual and m.id == marca_actual.id %}activo{% endif %}"
-                        id="btn-marca-{{ m.slug }}"
-                        onclick="cargarMarca(event, '{{ m.slug }}')">
-                    {{ m.nombre|upper }}
-                </button>
-            {% endfor %}
+    <div class="container mt-5 pt-4">
+        <div class="text-center mb-4 mt-4"> 
+            <h1 class="display-6 fw-bold text-secondary">Nuestra Carta</h1>
         </div>
-    </div>
 
-    <div class="container mb-5 contenido-menu-wrapper" id="platos-container">
-        
-        <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-            <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="d-flex">
-                    <div class="toast-body"><i class="fas fa-check-circle me-2"></i> ¡Agregado!</div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-                </div>
+        <div class="marcas-sticky-panel mb-4"> 
+            <div class="d-flex justify-content-center flex-wrap" id="contenedor-marcas">
+                {% for m in todas_marcas %}
+                    <button type="button" 
+                            class="btn-marca-custom {% if marca_actual and m.id == marca_actual.id %}activo{% endif %}"
+                            id="btn-marca-{{ m.slug }}"
+                            onclick="cargarMarca(event, '{{ m.slug }}')">
+                        {{ m.nombre|upper }}
+                    </button>
+                {% endfor %}
             </div>
         </div>
 
-        {% include 'catalogo/platos_list.html' %} 
+        <div id="platos-container">
+            {% include 'catalogo/platos_list.html' %} 
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalUniversal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" id="contenidoModal"></div>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 9999">
+        <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body"><i class="fas fa-check me-2"></i> ¡Agregado al carrito!</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
     </div>
 
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-        // ==========================================
-        // VARIABLES GLOBALES PARA MEMORIA DE SCROLL
-        // ==========================================
-        
-        // Objeto para guardar posiciones: { 'terramar': 1200, 'a-fuego': 500 }
-        const memoriaScroll = {}; 
-        
-        // Guardamos cuál es la marca actual al cargar la página por primera vez
-        let marcaActualGlobal = "{{ marca_actual.slug|default:'' }}"; 
+        // === 1. MEMORIA DE SCROLL Y ESTADO ===
+        const scrollMemory = {}; 
+        let marcaActualSlug = "{{ marca_actual.slug|default:'' }}";
 
-        // ==========================================
-        // 1. FUNCIÓN DE CARGA CON MEMORIA
-        // ==========================================
-        function cargarMarca(event, slug) {
-            event.preventDefault();
+        // Función auxiliar para actualizar visualmente todos los badges de la marca
+        function actualizarBadgesMarca(carritoData) {
+            document.querySelectorAll('[id^="badge-"]').forEach(badge => {
+                const varianteId = badge.id.split('-')[1];
+                const cantidad = carritoData[varianteId] || 0; 
+
+                badge.innerText = cantidad;
+                
+                if (cantidad > 0) {
+                    badge.classList.remove('d-none');
+                    badge.classList.add('bg-dark');
+                } else {
+                    badge.classList.add('d-none');
+                    badge.classList.remove('bg-dark');
+                }
+            });
+        }
+
+        // Función para cambiar de marca (Tab - AJAX)
+        function cargarMarca(e, slug) {
+            e.preventDefault();
             
-            // Si ya estamos en esta marca, no hacemos nada
-            if (slug === marcaActualGlobal) return;
+            if (marcaActualSlug) {
+                scrollMemory[marcaActualSlug] = window.scrollY;
+            }
 
-            console.log(`Cambiando de ${marcaActualGlobal} a ${slug}`);
+            document.querySelectorAll('.btn-marca-custom').forEach(b => b.classList.remove('activo'));
+            const btn = document.getElementById('btn-marca-' + slug);
+            if(btn) btn.classList.add('activo');
 
-            // A. GUARDAR MEMORIA: Antes de irnos, guardamos dónde estamos scrolleados
-            memoriaScroll[marcaActualGlobal] = window.scrollY;
-            
-            // B. ACTUALIZAR REFERENCIA: Ahora la marca actual será la nueva
-            marcaActualGlobal = slug;
+            const container = document.getElementById('platos-container');
+            container.style.opacity = '0.4'; 
 
-            const contenedor = document.getElementById('platos-container');
-            const url = `/ajax/platos/${slug}/`;
+            fetch(`/ajax/platos/${slug}/`)
+                .then(r => r.json()) 
+                .then(data => {
+                    // 1. Inyectamos el HTML
+                    container.innerHTML = data.html; 
+                    container.style.opacity = '1';
+                    
+                    // 2. ACTUALIZACIÓN CRÍTICA AJAX: Forzamos el estado visual con los datos del JSON
+                    if (data.carrito_data) {
+                        actualizarBadgesMarca(data.carrito_data);
+                    }
+                    
+                    // 3. Actualizar contador global del carrito
+                    const cartCount = document.getElementById('cart-count');
+                    if(cartCount) { 
+                        cartCount.innerText = data.cart_count; 
+                        if(data.cart_count > 0) {
+                            cartCount.classList.remove('d-none');
+                        } else {
+                            cartCount.classList.add('d-none');
+                        }
+                    }
 
-            // Efecto visual
-            contenedor.style.opacity = '0.4';
+                    // 4. Reactivar formularios y scroll
+                    activarFormulariosDirectos();
+                    marcaActualSlug = slug;
+                    sessionStorage.setItem('marcaActiva', slug); 
 
-            fetch(url)
-                .then(response => {
-                    if (!response.ok) throw new Error('Error servidor');
-                    return response.text();
-                })
-                .then(html => {
-                    // C. CAMBIAR CONTENIDO
-                    contenedor.innerHTML = html;
-
-                    // D. ACTUALIZAR BOTONES
-                    document.querySelectorAll('.btn-marca-custom').forEach(btn => btn.classList.remove('activo'));
-                    const btnActivo = document.getElementById('btn-marca-' + slug);
-                    if(btnActivo) btnActivo.classList.add('activo');
-
-                    // E. REACTIVAR FORMULARIOS
-                    activarFormulariosCarrito();
-
-                    // F. RESTAURAR SCROLL (LA MAGIA)
-                    contenedor.style.opacity = '1';
-
-                    if (memoriaScroll[slug] !== undefined) {
-                        // Si ya habíamos estado aquí, volvemos a esa posición exacta
-                        // Usamos un pequeño timeout para asegurar que el navegador renderizó la altura
-                        setTimeout(() => {
-                            window.scrollTo({
-                                top: memoriaScroll[slug],
-                                behavior: 'auto' // 'auto' es instantáneo, 'smooth' es suave
-                            });
-                        }, 10);
+                    if (scrollMemory[slug] !== undefined) {
+                        window.scrollTo({ top: scrollMemory[slug], behavior: 'auto' });
                     } else {
-                        // Si es la primera vez que entramos a esta marca, vamos al inicio (arriba)
-                        // pero respetando el sticky header (ajustamos a 0 o un poco más abajo si quieres)
-                        window.scrollTo(0, 0);
+                        const offset = container.offsetTop - 140; 
+                        window.scrollTo({ top: offset > 0 ? offset : 0, behavior: 'smooth' });
                     }
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                    contenedor.style.opacity = '1';
+                .catch(err => {
+                    console.error(err);
                 });
         }
 
-        // ==========================================
-        // 2. LÓGICA DEL CARRITO (Igual que antes)
-        // ==========================================
-        function activarFormulariosCarrito() {
-            const forms = document.querySelectorAll('.form-ajax');
-            const toastEl = document.getElementById('liveToast');
-            const toast = toastEl ? new bootstrap.Toast(toastEl) : null;
-            const cartCounter = document.getElementById('cart-count');
-
-            forms.forEach(form => {
-                if (form.getAttribute('data-listo') === 'si') return;
-                form.setAttribute('data-listo', 'si');
-
-                form.addEventListener('submit', function (e) {
-                    e.preventDefault(); 
-                    const url = this.action;
-                    const formData = new FormData(this);
-                    const btn = this.querySelector('.btn-agregar');
-                    const badge = this.querySelector('span[id^="badge-"]');
-                    const originalText = btn.innerHTML;
-
-                    btn.disabled = true;
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-                    fetch(url, {
-                        method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                    })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.status === 'ok') {
-                            if(toast) toast.show();
-                            if(cartCounter) {
-                                cartCounter.innerText = data.cant_total;
-                                cartCounter.classList.remove('d-none');
-                            }
-                            if(badge) {
-                                badge.innerText = data.cant_producto;
-                                badge.classList.remove('d-none');
-                                badge.classList.add('bg-success');
-                                setTimeout(() => {
-                                    badge.classList.remove('bg-success');
-                                    badge.classList.add('bg-dark');
-                                }, 500);
-                            }
-                            btn.disabled = false;
-                            btn.innerHTML = originalText;
-                        } else {
-                            Swal.fire({ icon: 'error', title: 'Oops...', text: data.message });
-                            btn.innerHTML = 'Agotado';
-                            btn.disabled = true;
+        // --- SOLUCIÓN DE PERSISTENCIA AL CARGAR LA PÁGINA (Regreso del Carrito) ---
+        document.addEventListener('DOMContentLoaded', function() {
+            activarFormulariosDirectos();
+            
+            // 1. LECTURA CRÍTICA DE DATOS: Leemos el JSON del atributo data-
+            const dataElement = document.getElementById('data-carrito-inicial');
+            
+            if (dataElement) {
+                try {
+                    // Leemos el string del atributo 'data-carrito'
+                    const carritoDataString = dataElement.getAttribute('data-carrito').trim();
+                    
+                    if (carritoDataString && carritoDataString !== '{}') {
+                        // Usamos JSON.parse para convertir el string JSON limpio a un objeto JS
+                        const carritoDataInicial = JSON.parse(carritoDataString); 
+                        
+                        if (Object.keys(carritoDataInicial).length > 0) {
+                            actualizarBadgesMarca(carritoDataInicial);
                         }
-                    })
-                    .catch(() => {
-                        btn.disabled = false;
-                        btn.innerHTML = originalText;
-                    });
+                    }
+                } catch (e) {
+                    console.error("Error al parsear el carrito_data inicial:", e);
+                }
+            }
+
+
+            // 2. Lógica para activar la última marca (memoria de navegación)
+            const lastMarca = sessionStorage.getItem('marcaActiva');
+            if(lastMarca && lastMarca !== "{{ marca_actual.slug }}" && lastMarca !== "undefined") {
+                const btn = document.getElementById('btn-marca-' + lastMarca);
+                if(btn) btn.click();
+            }
+        });
+        // --- FIN DE LA SOLUCIÓN DE PERSISTENCIA AL CARGAR LA PÁGINA ---
+
+        // === 2. ABRIR MODAL (Sin cambios funcionales) ===
+        function abrirModal(url) {
+            const modalEl = document.getElementById('modalUniversal');
+            const contenido = document.getElementById('contenidoModal');
+            
+            contenido.innerHTML = '<div class="p-5 text-center"><div class="spinner-border text-primary"></div></div>';
+            const modalBS = new bootstrap.Modal(modalEl);
+            modalBS.show();
+
+            fetch(url)
+                .then(r => r.text())
+                .then(html => {
+                    contenido.innerHTML = html;
+                    const form = document.getElementById('form-modal-ajax');
+                    if (form) conectarFormularioAjax(form, modalBS);
+                })
+                .catch(err => {
+                    console.error(err);
+                    contenido.innerHTML = '<div class="alert alert-danger m-3">Error al cargar opciones</div>';
+                });
+        }
+
+        // === 3. LOGICA AJAX FORMULARIOS (Sin cambios funcionales) ===
+        function conectarFormularioAjax(form, modalInstance = null) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault(); 
+                
+                const btn = this.querySelector('button[type="submit"]');
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+                
+                const formActionUrl = this.action;
+                const varianteIdMatch = formActionUrl.match(/\/(\d+)\/$/);
+                const varianteId = varianteIdMatch ? varianteIdMatch[1] : null;
+
+                fetch(this.action, {
+                    method: 'POST',
+                    body: new FormData(this),
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        if (modalInstance) modalInstance.hide();
+                        
+                        // 1. Actualizar contador global del carrito
+                        const cartCount = document.getElementById('cart-count');
+                        if(cartCount) { 
+                            cartCount.innerText = data.cant_total; 
+                            if(data.cant_total > 0) {
+                                cartCount.classList.remove('d-none');
+                            } else {
+                                cartCount.classList.add('d-none');
+                            }
+                        }
+                        
+                        // 2. ACTUALIZACIÓN CRÍTICA DEL BADGE NEGRO
+                        if(varianteId) {
+                            const badge = document.getElementById('badge-' + varianteId);
+                            
+                            if(badge) { 
+                                badge.innerText = data.cant_producto; 
+                                
+                                if(data.cant_producto > 0) {
+                                    badge.classList.remove('d-none');
+                                    badge.classList.remove('bg-dark'); 
+                                    
+                                    badge.classList.add('bg-success');
+                                    setTimeout(() => {
+                                        badge.classList.remove('bg-success');
+                                        badge.classList.add('bg-dark'); 
+                                    }, 1000);
+
+                                } else {
+                                    badge.classList.add('d-none');
+                                }
+                            }
+                        }
+
+                        // 3. Mostrar la notificación Toast
+                        const toast = new bootstrap.Toast(document.getElementById('liveToast'));
+                        toast.show();
+                    } else {
+                        Swal.fire('Atención', data.message || 'Error desconocido', 'warning');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    Swal.fire('Error', 'Ocurrió un error de conexión o servidor.', 'error');
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
                 });
             });
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            activarFormulariosCarrito();
-        });
+        function activarFormulariosDirectos() {
+            document.querySelectorAll('.form-ajax-directo').forEach(form => {
+                conectarFormularioAjax(form);
+            });
+        }
     </script>
-
 {% endblock %}
