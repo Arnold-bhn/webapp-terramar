@@ -76,26 +76,80 @@ class Plato(models.Model):
             
         return True # Todo ok, pase usted
 
-# En catalogo/models.py
+
+
+# --- NUEVAS CLASES PARA EL SISTEMA DE OPCIONES ---
+
+class GrupoOpciones(models.Model):
+    """
+    Define un grupo de elecciones. Ej: 'Guarniciones', 'Salsas', 'Término de la carne'.
+    """
+    nombre = models.CharField(max_length=100, verbose_name="Nombre del Grupo (Ej: Guarniciones)")
+    
+    # Lógica de Selección
+    seleccion_multiple = models.BooleanField(
+        default=False, 
+        verbose_name="¿Permitir varios?",
+        help_text="Check = Checkboxes (Varios). Sin check = Radio Buttons (Solo uno)."
+    )
+    obligatorio = models.BooleanField(
+        default=False, 
+        verbose_name="¿Es obligatorio?",
+        help_text="El cliente NO podrá agregar al carrito sin elegir esto."
+    )
+    minimo = models.PositiveIntegerField(default=0, verbose_name="Mínimo a elegir")
+    maximo = models.PositiveIntegerField(default=1, verbose_name="Máximo a elegir")
+    
+    activo = models.BooleanField(default=True)
+
+    def __str__(self):
+        tipo = "Multi" if self.seleccion_multiple else "Unico"
+        req = "Obligatorio" if self.obligatorio else "Opcional"
+        return f"{self.nombre} [{tipo} - {req}]"
+
+    class Meta:
+        verbose_name = "Grupo de Opciones"
+        verbose_name_plural = "Grupos de Opciones"
+
+
+class Opcion(models.Model):
+    """
+    Cada ítem seleccionable. Ej: 'Papas', 'Camote', 'Mayonesa'.
+    """
+    grupo = models.ForeignKey(GrupoOpciones, on_delete=models.CASCADE, related_name='opciones')
+    nombre = models.CharField(max_length=100)
+    precio_extra = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00, 
+        help_text="Costo adicional (0.00 si es gratis)"
+    )
+    activo = models.BooleanField(default=True)
+
+    def __str__(self):
+        if self.precio_extra > 0:
+            return f"{self.nombre} (+ S/{self.precio_extra})"
+        return self.nombre
+
+
+# --- TU CLASE VARIANTE ACTUALIZADA ---
+
 class Variante(models.Model):
     plato = models.ForeignKey(Plato, on_delete=models.CASCADE, related_name='variantes')
     nombre = models.CharField(max_length=50, default="Estándar", help_text="Ej: Personal, Fuente, Vaso")
     precio = models.DecimalField(max_digits=10, decimal_places=2)
     
-    # --- NUEVO CAMPO: Interruptor individual ---
+    # === NUEVA CONEXIÓN AQUÍ ===
+    grupos_opciones = models.ManyToManyField(
+        GrupoOpciones, 
+        blank=True, 
+        verbose_name="Personalización disponible"
+    )
+    # ===========================
+
     activo = models.BooleanField(default=True, verbose_name="¿Disponible?", help_text="Desmarcar si se agotó solo esta presentación")
     
     def __str__(self):
         return f"{self.plato.nombre} - {self.nombre} (S/ {self.precio})"
 
-    # --- LÓGICA DE DISPONIBILIDAD ACTUALIZADA ---
     @property
     def esta_disponible(self):
-        """
-        La variante está disponible SI:
-        1. Ella misma está activa (activo=True).
-        2. Y SU PAPÁ (El Plato) también está disponible (tiene insumos y está activo).
-        """          
-        # 2. Chequeo del padre (¿Queda pescado para cocinar?)
         return self.activo and self.plato.esta_disponible
-    

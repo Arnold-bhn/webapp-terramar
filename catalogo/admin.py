@@ -1,122 +1,119 @@
 from django.contrib import admin
-from .models import InsumoCritico, Categoria, Plato, Variante
+from .models import InsumoCritico, Categoria, Plato, Variante, GrupoOpciones, Opcion
 from django.utils.safestring import mark_safe
-from django.utils.html import format_html
 from django.urls import reverse
 
-# Register your models here.
-# Esto permite poner los precios DENTRO de la pantalla del Plato
-'''class VarianteInline(admin.TabularInline):
-    model = Variante
-    extra = 1
-'''
-# 1. Configuración de la "Tablita" dentro del Plato
-class VarianteInline(admin.TabularInline):
-    model = Variante
-    # 'extra = 0' hace que no salgan filas vacías extra, 
-    # pero si no ves nada, prueba cambiarlo a 1 para ver si aparece al menos la fila de "Agregar nuevo".
-    extra = 0 
-    
-    # Campos que quieres ver y editar ahí mismo
-    fields = ('nombre', 'precio', 'activo')
-    
-    # IMPORTANTE: Quitamos 'classes': ['collapse'] para que SIEMPRE se vean
-    
-    # Esto ayuda si tienes muchas variantes, para que no ocupen tanto espacio vertical
-    show_change_link = True
-
+# ==========================================
+# 1. GESTIÓN DE INSUMOS Y CATEGORÍAS
+# ==========================================
 @admin.register(InsumoCritico)
 class InsumoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'sede', 'disponible')
-    list_editable = ('disponible',) # Switch rápido
-    list_filter = ('sede',)
+    list_editable = ('disponible',)
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'marca', 'orden', 'activo')
-    list_editable = ('orden', 'activo')
-    list_filter = ('marca',)
+    list_display = ('nombre', 'marca', 'orden')
+    list_editable = ('orden',)
+
+# ==========================================
+# 2. GESTIÓN DE GRUPOS DE OPCIONES
+# ==========================================
+class OpcionInline(admin.TabularInline):
+    """
+    Las opciones (Papas, Camote) sí se ven mejor en tabla pequeña
+    """
+    model = Opcion
+    extra = 1
+
+@admin.register(GrupoOpciones)
+class GrupoOpcionesAdmin(admin.ModelAdmin):
+    inlines = [OpcionInline]
+    list_display = ('nombre', 'seleccion_multiple', 'obligatorio', 'activo')
+    search_fields = ['nombre']
+
+# ==========================================
+# 3. GESTIÓN DE PLATOS Y VARIANTES (MODO BLOQUE)
+# ==========================================
+
+# CAMBIO CLAVE AQUÍ: Usamos StackedInline en lugar de TabularInline
+class VarianteInline(admin.StackedInline):
+    model = Variante
+    extra = 0
+    
+    # filter_horizontal se ve MUCHO mejor en StackedInline (ocupa todo el ancho)
+    filter_horizontal = ('grupos_opciones',) 
+    
+    fields = (
+        ('nombre', 'precio', 'activo'), # Estos 3 en una sola fila para ahorrar espacio vertical
+        'grupos_opciones'               # Esto en su propia fila grande
+    )
+    
+    show_change_link = True
 
 @admin.register(Plato)
 class PlatoAdmin(admin.ModelAdmin):
-    # 1. AGREGAMOS 'control_variantes' AQUI EN LA LISTA VISIBLE
+    # Mantenemos tu semáforo visual en la lista principal
     list_display = ('nombre_completo', 'categoria', 'orden', 'activo_manual', 'control_variantes')
-    
     list_filter = ('marca', 'categoria')
     list_editable = ('orden', 'activo_manual')
     search_fields = ('nombre',)
-    # inlines = [VarianteInline] # Descomenta esto si tienes tu Inline definido arriba
+    
     filter_horizontal = ('insumos_clave',)
+    
+    # Aquí cargamos las variantes en bloques grandes
+    inlines = [VarianteInline]
 
     @admin.display(description='Plato', ordering='nombre')
     def nombre_completo(self, obj):
         return str(obj)
 
-    # --- AQUÍ ESTÁ TU MÉTODO ARREGLADO ---
+    # --- SEMÁFORO VISUAL (Tu requerimiento anterior) ---
     def control_variantes(self, obj):
         html_parts = []
         
-        # Recorremos todas las variantes de este plato
         for variante in obj.variantes.all():
             if variante.activo:
-                color = "#198754" # Verde (ON)
-                estado = "ON"
+                color = "#198754" # Verde
                 opacity = "1"
             else:
-                color = "#dc3545" # Rojo (OFF)
-                estado = "OFF"
-                opacity = "0.6" # Un poco transparente si está apagado
+                color = "#dc3545" # Rojo
+                opacity = "0.6"
             
-            # Ahora esta línea YA FUNCIONARÁ porque creamos la URL en el Paso 2
-            url = reverse('toggle_variante', args=[variante.id])
-            
+            # Protección por si no existe la URL aún
+            try:
+                url = reverse('toggle_variante', args=[variante.id])
+                href = f'href="{url}"'
+            except:
+                href = 'href="#" onclick="return false;"'
+
             boton = f"""
-            <a href="{url}" style="
-                display: inline-block;
-                padding: 4px 8px;
-                margin: 2px;
-                background-color: {color};
-                color: white;
-                text-decoration: none;
-                border-radius: 4px;
-                font-size: 11px;
-                font-weight: bold;
-                border: 1px solid #000;
-                opacity: {opacity};
-                box-shadow: 1px 1px 2px rgba(0,0,0,0.2);
-            " title="Clic para cambiar estado">
-                {variante.nombre}: {estado}
+            <a {href} style="
+                display: inline-block; padding: 4px 8px; margin: 2px;
+                background-color: {color}; color: white; text-decoration: none;
+                border-radius: 4px; font-size: 11px; font-weight: bold;
+                opacity: {opacity}; border: 1px solid #000;
+            ">
+                {variante.nombre}
             </a>
             """
             html_parts.append(boton)
         
         if not html_parts:
             return "-"
-
         return mark_safe("".join(html_parts))
     
-    control_variantes.short_description = "Variantes (Clic para alternar)"
+    control_variantes.short_description = "Variantes (Click cambiar)"
 
-
-# Registramos Variante suelta también por si necesitamos buscar precios específicos
+# Registro individual de variantes (opcional, pero útil)
 @admin.register(Variante)
 class VarianteAdmin(admin.ModelAdmin):
-    # Columnas que verás
     list_display = ('obtener_nombre_completo', 'precio', 'activo')
-    
-    # ESTO ES LA MAGIA: Te permite editar el check sin entrar
     list_editable = ('activo', 'precio') 
-    
-    # Filtros laterales para encontrar rápido (por marca o categoría del plato padre)
     list_filter = ('activo', 'plato__marca', 'plato__categoria')
-    
-    # Buscador (busca por nombre de variante O nombre del plato)
     search_fields = ('nombre', 'plato__nombre')
-    
-    # Ordenar por plato para que salgan agrupados
-    ordering = ('plato',)
+    filter_horizontal = ('grupos_opciones',) 
 
-    # Función para que en la lista se vea "Ceviche - Personal" y no solo "Personal"
     @admin.display(description='Producto')
     def obtener_nombre_completo(self, obj):
         return f"{obj.plato.nombre} - {obj.nombre}"

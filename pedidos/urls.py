@@ -1,3 +1,4 @@
+'''
 from django.urls import path
 from . import views
 
@@ -21,4 +22,4 @@ urlpatterns = [
     path('<slug:marca_slug>/', views.catalogo_por_marca, name='catalogo_marca'),
     path('ajax/platos/<slug:marca_slug>/', views.ajax_platos_by_marca, name='ajax_platos_marca'),
 ] 
-
+'''
