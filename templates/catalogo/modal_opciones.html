@@ -36,7 +36,7 @@
                             
                             {% with precio_extra=opcion.precio_extra|default:0 %}
                             
-                                {% if grupo.seleccion_multiple %}
+                                {% if not grupo.obligatorio %}
                                     <input class="form-check-input" type="checkbox" 
                                             name="grupo_{{ grupo.id }}" 
                                             value="{{ opcion.id }}" 
