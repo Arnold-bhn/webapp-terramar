@@ -114,53 +114,77 @@ class Carrito:
                 
         return total
 
+    
     def iterar_detalles(self):
         """
-        Itera sobre los ítems del carrito y adjunta el objeto Variante,
-        y carga los detalles de las Opciones en una consulta eficiente.
+        Genera los items del carrito usando objetos directos para evitar KeyError.
         """
-        # Se usa .get() para evitar KeyError si un item se corrompe y no tiene 'variante_id'
-        variante_ids = set(item.get('variante_id') for item in self.carrito.values() if item.get('variante_id'))
+        # 1. Obtener IDs de variantes
+        variante_ids = [item['variante_id'] for item in self.carrito.values() if item.get('variante_id')]
+        
+        # Traemos las variantes con su plato
         variantes = Variante.objects.filter(id__in=variante_ids).select_related('plato')
         variantes_dict = {v.id: v for v in variantes}
 
-        # 1. Recolectar todos los IDs de opciones en el carrito
-        all_opcion_ids = set()
-        for item_data in self.carrito.values():
-            all_opcion_ids.update(item_data.get('opciones', []))
-            
-        # 2. Obtener todos los objetos Opcion en una sola consulta
-        opciones = Opcion.objects.filter(id__in=all_opcion_ids).values('id', 'nombre', 'precio_extra')
-        opciones_dict = {o['id']: o for o in opciones}
+        # 2. Obtener IDs de todas las opciones en el carrito
+        all_opcion_ids = []
+        for item in self.carrito.values():
+            opciones_ids = item.get('opciones', [])
+            if opciones_ids:
+                all_opcion_ids.extend(opciones_ids)
+        
+        # 3. Traer las opciones CON su grupo (OBJETOS COMPLETOS, NO VALORES)
+        # Usamos select_related('grupo') para optimizar y evitar consultas extra
+        if all_opcion_ids:
+            opciones_db = Opcion.objects.filter(id__in=all_opcion_ids).select_related('grupo')
+            opciones_dict = {op.id: op for op in opciones_db}
+        else:
+            opciones_dict = {}
 
-        for item_key, item_data in self.carrito.items():
-            # --- VALIDACIÓN DE SEGURIDAD (Para evitar NoReverseMatch) ---
-            variante_id = item_data.get('variante_id')
-            if not item_key or not variante_id or variante_id not in variantes_dict:
-                continue 
-            # --------------------------------------------------------
+        # 4. Iterar sobre el carrito de sesión
+        for key, item in self.carrito.items():
+            variante_id = item.get('variante_id')
+            
+            # Si la variante ya no existe en BD, saltamos
+            if not variante_id or variante_id not in variantes_dict:
+                continue
 
             producto = variantes_dict[variante_id]
-            precio_unitario = Decimal(item_data.get('precio_unitario', '0.00'))
             
-            # 3. Adjuntar la información de las opciones para la plantilla
-            opciones_detalle = []
-            for opcion_id in item_data.get('opciones', []):
-                opcion = opciones_dict.get(opcion_id)
-                if opcion:
-                    opciones_detalle.append({
-                        'nombre': opcion['nombre'],
-                        'precio_extra': opcion['precio_extra']
-                    })
+            # Calcular precios (asegurando tipos de datos)
+            precio_base = Decimal(str(item['precio_unitario']))
+            cantidad = int(item['cantidad'])
+            subtotal = precio_base * cantidad
+
+            # 5. Construir la lista de opciones para el template
+            # Usamos el nombre plural 'opciones_detalles' para coincidir con tu HTML
+            lista_opciones = []
+            
+            ids_opciones_item = item.get('opciones', [])
+            if ids_opciones_item:
+                for op_id in ids_opciones_item:
+                    op_id_int = int(op_id)
+                    # Verificamos si existe en el diccionario recuperado de la BD
+                    if op_id_int in opciones_dict:
+                        op_obj = opciones_dict[op_id_int]
+                        
+                        # AQUÍ ESTABA EL ERROR: Ahora accedemos al objeto de forma segura
+                        nombre_grupo = op_obj.grupo.nombre if op_obj.grupo else ''
+                        
+                        lista_opciones.append({
+                            'nombre': op_obj.nombre,
+                            'precio': op_obj.precio_extra,
+                            'grupo': nombre_grupo
+                        })
 
             yield {
-                'key': item_key, # Clave para la plantilla (item.key)
+                'key': key,
                 'producto': producto,
-                'cantidad': item_data.get('cantidad', 0), 
-                'precio_unitario': precio_unitario, # Precio unitario (base + opciones)
-                'subtotal': precio_unitario * item_data.get('cantidad', 0),
-                'opciones_detalle': opciones_detalle,
-                'notas': item_data.get('notas', '')
+                'cantidad': cantidad,
+                'precio_unitario': precio_base,
+                'subtotal': subtotal,
+                'opciones_detalles': lista_opciones, # Variable en PLURAL como en tu HTML
+                'notas': item.get('notas', '')
             }
 
     def get_variante_ids(self):

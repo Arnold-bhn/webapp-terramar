@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import InsumoCritico, Categoria, Plato, Variante, GrupoOpciones, Opcion
+from .models import InsumoCritico, Categoria, Plato, Variante, GrupoOpciones, Opcion, Inclusion
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 
@@ -42,11 +42,12 @@ class VarianteInline(admin.StackedInline):
     extra = 0
     
     # filter_horizontal se ve MUCHO mejor en StackedInline (ocupa todo el ancho)
-    filter_horizontal = ('grupos_opciones',) 
+    filter_horizontal = ('grupos_opciones', 'inclusiones') 
     
     fields = (
         ('nombre', 'precio', 'activo'), # Estos 3 en una sola fila para ahorrar espacio vertical
-        'grupos_opciones'               # Esto en su propia fila grande
+        'grupos_opciones',             # Esto en su propia fila grande
+        'inclusiones',
     )
     
     show_change_link = True
@@ -112,8 +113,15 @@ class VarianteAdmin(admin.ModelAdmin):
     list_editable = ('activo', 'precio') 
     list_filter = ('activo', 'plato__marca', 'plato__categoria')
     search_fields = ('nombre', 'plato__nombre')
-    filter_horizontal = ('grupos_opciones',) 
+    filter_horizontal = ('grupos_opciones', 'inclusiones') 
 
     @admin.display(description='Producto')
     def obtener_nombre_completo(self, obj):
         return f"{obj.plato.nombre} - {obj.nombre}"
+    
+
+@admin.register(Inclusion)
+class InclusionAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'activo')
+    list_editable = ('activo',)
+    search_fields = ('nombre',)

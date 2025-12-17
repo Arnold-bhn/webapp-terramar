@@ -290,4 +290,4 @@ ADMIN_REORDER = (
 
 
 CART_SESSION_ID = 'carrito' 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+#STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')

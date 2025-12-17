@@ -130,8 +130,24 @@ class Opcion(models.Model):
         return self.nombre
 
 
-# --- TU CLASE VARIANTE ACTUALIZADA ---
+class Inclusion(models.Model):
+    """
+    Elementos que ya vienen incluidos en el plato y NO se eligen.
+    Ej: 'Incluye Cubiertos', 'Incluye Arroz y Ensalada'.
+    """
+    nombre = models.CharField(max_length=100, help_text="Ej: Cubiertos, Salsas, Servilletas")
+    activo = models.BooleanField(default=True)
 
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Inclusión"
+        verbose_name_plural = "Inclusiones"
+
+
+
+# --- TU CLASE VARIANTE ACTUALIZADA ---
 class Variante(models.Model):
     plato = models.ForeignKey(Plato, on_delete=models.CASCADE, related_name='variantes')
     nombre = models.CharField(max_length=50, default="Estándar", help_text="Ej: Personal, Fuente, Vaso")
@@ -144,6 +160,13 @@ class Variante(models.Model):
         verbose_name="Personalización disponible"
     )
     # ===========================
+
+    # === NUEVA CONEXIÓN DE INCLUSIONES FIJAS ===
+    inclusiones = models.ManyToManyField(
+        Inclusion, 
+        blank=True, 
+        verbose_name="Elementos incluidos de fábrica"
+    )
 
     activo = models.BooleanField(default=True, verbose_name="¿Disponible?", help_text="Desmarcar si se agotó solo esta presentación")
     

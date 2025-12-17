@@ -1,3 +1,4 @@
+
 {% load humanize %}
 
 <div class="modal-header border-0 pb-0">
@@ -5,7 +6,7 @@
     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 </div>
 
-<form method="POST" action="{% url 'agregar_carrito' variante.id %}" id="form-modal-ajax">
+<form method="POST" action="{% url 'agregar_carrito' variante.id %}" id="form-modal-ajax" novalidate>
     {% csrf_token %}
     
     <input type="hidden" name="variante_id" value="{{ variante.id }}">
@@ -14,18 +15,28 @@
         
         <div class="d-flex justify-content-between align-items-center mb-3">
             <span class="fw-bold text-muted">Precio Base</span>
-            <span class="fw-bold fs-5">S/ {{ variante.precio|floatformat:2|intcomma }}</span>
+            <span class="fw-bold fs-5">S/ <span id="lbl-precio-base" data-valor="{{ variante.precio|floatformat:2 }}">{{ variante.precio|floatformat:2|intcomma }}</span></span>
         </div>
-        
+        {% if inclusiones %}
+            <div class="mb-3 px-1">
+                <div class="d-flex flex-wrap gap-2">
+                    {% for inc in inclusiones %}
+                    <span class="badge border text-dark fw-normal bg-light d-flex align-items-center" style="font-size: 0.75em; border-radius: 8px; padding: 6px 10px;">
+                        <i class="fas fa-check-circle text-success me-2"></i> {{ inc.nombre }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         <hr class="my-2">
 
         {% if grupos %}
             {% for grupo in grupos %}
-                <div class="mb-3">
+                <div class="mb-3 grupo-opciones-contenedor" data-obligatorio="{{ grupo.obligatorio|yesno:'true,false' }}">
                     <div class="d-flex justify-content-between mb-2">
                         <label class="fw-bold">{{ grupo.nombre }}</label>
                         {% if grupo.obligatorio %}
-                            <span class="badge bg-danger bg-opacity-75" style="font-size: 0.65em;">Obligatorio</span>
+                            <span class="badge bg-danger bg-opacity-75" style="font-size: 0.65em;">Requerido</span>
                         {% else %}
                             <span class="badge bg-secondary bg-opacity-50" style="font-size: 0.65em;">Opcional</span>
                         {% endif %}
@@ -47,7 +58,7 @@
                                             name="grupo_{{ grupo.id }}" 
                                             value="{{ opcion.id }}" 
                                             id="opt_{{ opcion.id }}"
-                                            {% if forloop.first and grupo.obligatorio %}checked{% endif %}
+                                            {% if grupo.obligatorio %}required{% endif %}
                                             data-precio-extra="{{ precio_extra|floatformat:2 }}">
                                 {% endif %}
                             
@@ -73,46 +84,20 @@
         </div>
     </div>
 
+    <div id="error-message-modal" class="mx-3 alert alert-danger d-none" style="font-size: 0.85em; border-radius: 10px;">
+        <i class="fas fa-exclamation-circle me-2"></i> <span id="error-text"></span>
+    </div>
+
     <div class="modal-footer border-0 pt-0">
+        <div id="error-message-modal" class="mx-3 mb-3 alert alert-danger d-none border-0 shadow-sm" 
+            style="background-color: #fff5f5; color: #dc3545; border-radius: 12px; border-left: 5px solid #dc3545 !important;">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <span id="error-text" class="fw-bold small"></span>
+            </div>
+        </div>
         <button type="submit" class="btn btn-primary w-100 rounded-pill py-3 fw-bold shadow-sm">
             AGREGAR AL PEDIDO - S/ <span id="btn-precio-total">{{ variante.precio|floatformat:2|intcomma }}</span>
         </button>
     </div>
 </form>
-
-<script>
-    // Valor inicial del precio base de la variante
-    const precioBase = parseFloat("{{ variante.precio|floatformat:2 }}");
-    const spanPrecioTotal = document.getElementById('btn-precio-total');
-    const formModal = document.getElementById('form-modal-ajax');
-    
-    // Función para formatear el número (simula intcomma en JS)
-    const formatPrice = (price) => {
-        return price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); 
-    };
-    
-    // Función principal para calcular y actualizar el precio
-    function actualizarPrecioTotal() {
-        let precioActual = precioBase;
-        
-        // Recorremos solo los inputs marcados (radio y checkbox)
-        formModal.querySelectorAll('input[type="radio"]:checked, input[type="checkbox"]:checked').forEach(input => {
-            
-            // Leemos el precio extra del atributo data-precio-extra
-            const precioExtra = parseFloat(input.getAttribute('data-precio-extra')) || 0;
-            precioActual += precioExtra;
-        });
-
-        // 1. Actualizar el texto del botón (visual)
-        spanPrecioTotal.innerText = formatPrice(precioActual);
-    }
-    
-    // Añadir escuchadores de eventos a todos los inputs
-    formModal.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(input => {
-        input.addEventListener('change', actualizarPrecioTotal);
-    });
-
-    // Ejecutar al cargar para mostrar el precio base y cualquier opción pre-seleccionada
-    setTimeout(actualizarPrecioTotal, 0);
-    
-</script>

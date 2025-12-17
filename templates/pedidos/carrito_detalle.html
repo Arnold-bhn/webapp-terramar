@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load humanize %} {% block content %}
+{% load humanize %} 
+
+{% block content %}
 
 <style>
     .img-agotada {
@@ -15,11 +17,14 @@
         text-decoration: line-through;
         color: #999;
     }
-    .option-tag {
+    /* Estilos para el detalle tipo recibo */
+    .receipt-list {
+        font-size: 0.85rem;
+    }
+    .receipt-group {
         font-size: 0.75rem;
-        padding: 0.2rem 0.5rem;
-        margin-right: 5px;
-        margin-bottom: 3px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 </style>
 
@@ -33,13 +38,14 @@
         <div class="row">
             <div class="col-lg-8 mb-4">
                 <div class="card shadow-sm border-0">
+                    
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-secondary small text-uppercase">
                                 <tr>
                                     <th class="ps-4">Plato</th>
-                                    <th class="text-center" style="width: 150px;">Cant.</th>
                                     <th class="text-end" style="width: 120px;">Precio</th>
+                                    <th class="text-center" style="width: 150px;">Cant.</th>
                                     <th class="text-end pe-4" style="width: 120px;">Subtotal</th>
                                     <th style="width: 50px;"></th>
                                 </tr>
@@ -49,15 +55,20 @@
                                     <tr id="row-{{ item.key }}" class="item-row {% if not item.producto.esta_disponible %}row-agotada{% endif %}">
                                         
                                         <td class="ps-4 py-3">
-                                            <div class="d-flex align-items-center">
+                                            <div class="d-flex align-items-start"> 
+                                                
                                                 {% if item.producto.imagen %}
                                                     <img src="{{ item.producto.imagen.url }}" 
-                                                         class="rounded me-3 {% if not item.producto.esta_disponible %}img-agotada{% endif %}" 
-                                                         style="width: 50px; height: 50px; object-fit: cover;">
+                                                        class="rounded me-3 {% if not item.producto.esta_disponible %}img-agotada{% endif %}" 
+                                                        style="width: 60px; height: 60px; object-fit: cover;">
+                                                {% elif item.producto.plato.imagen %}
+                                                    <img src="{{ item.producto.plato.imagen.url }}" 
+                                                        class="rounded me-3 {% if not item.producto.esta_disponible %}img-agotada{% endif %}" 
+                                                        style="width: 60px; height: 60px; object-fit: cover;">
                                                 {% else %}
                                                     <div class="rounded me-3 bg-secondary d-flex align-items-center justify-content-center text-white {% if not item.producto.esta_disponible %}img-agotada{% endif %}" 
-                                                         style="width: 50px; height: 50px;">
-                                                         <i class="fas fa-utensils"></i>
+                                                        style="width: 60px; height: 60px;">
+                                                        <i class="fas fa-utensils"></i>
                                                     </div>
                                                 {% endif %}
                                                 
@@ -66,27 +77,67 @@
                                                         {{ item.producto.plato.nombre }} 
                                                         <small class="text-muted d-block fw-normal">{{ item.producto.nombre }}</small>
                                                     </strong>
+
+                                                    <div class="text-muted small mt-1">
+                                                        <strong>S/ {{ item.producto.precio|floatformat:2 }}</strong>
+                                                    </div>
                                                     
                                                     {% if not item.producto.esta_disponible %}
                                                         <span class="badge bg-danger mt-1" style="font-size: 0.65em;">AGOTADO</span>
                                                     {% endif %}
 
-                                                    {% if item.opciones_detalles %}
-                                                        <div class="mt-1">
-                                                            {% for opcion in item.opciones_detalles %}
-                                                                <span class="badge bg-info text-dark option-tag">
-                                                                    + {{ opcion.nombre }}
-                                                                </span>
+                                                    {% if item.producto.inclusiones.all %}
+                                                        <div class="mt-1 text-muted" style="font-size: 0.8rem;">
+                                                            <i class="fas fa-check-circle text-success me-1" style="font-size: 0.9em;"></i>
+                                                            <span class="fw-bold">Incluye:</span>
+                                                            {% for inc in item.producto.inclusiones.all %}
+                                                                {{ inc.nombre }}{% if not forloop.last %}, {% endif %}
                                                             {% endfor %}
                                                         </div>
                                                     {% endif %}
 
+                                                    {% if item.opciones_detalles %}
+                                                        <div class="mt-2 p-2 bg-light rounded border border-light text-start w-100">
+                                                            <ul class="list-unstyled mb-0 receipt-list">
+                                                                {% for opcion in item.opciones_detalles %}
+                                                                    <li class="d-flex justify-content-between align-items-center mb-1 border-bottom border-light pb-1">
+                                                                        <div class="lh-sm">
+                                                                            {% if opcion.grupo %}
+                                                                                <span class="fw-bold text-secondary receipt-group">
+                                                                                    {{ opcion.grupo }}:
+                                                                                </span>
+                                                                            {% endif %}
+                                                                            <span class="text-dark">{{ opcion.nombre }}</span>
+                                                                        </div>
+                                                                        
+                                                                        <div class="ms-2 text-nowrap">
+                                                                            {% if opcion.precio > 0 %}
+                                                                                <span class="text-primary fw-bold" style="font-size: 0.8rem;">
+                                                                                    + S/ {{ opcion.precio|floatformat:2 }}
+                                                                                </span>
+                                                                            {% else %}
+                                                                                <span class="text-muted fst-italic" style="font-size: 0.75rem;">(Incluido)</span>
+                                                                            {% endif %}
+                                                                        </div>
+                                                                    </li>
+                                                                {% endfor %}
+                                                            </ul>
+                                                        </div>
+                                                    {% endif %}
+
                                                     {% if item.notas %}
-                                                        <p class="text-muted small mt-1 mb-0 fst-italic">
-                                                            <i class="fas fa-comment-dots me-1"></i> Nota: "{{ item.notas|truncatechars:30 }}"
+                                                        <p class="text-muted small mt-2 mb-0 fst-italic border-top pt-1">
+                                                            <i class="fas fa-comment-dots me-1"></i> Nota: "{{ item.notas|truncatechars:50 }}"
                                                         </p>
                                                     {% endif %}
                                                 </div>
+                                            </div>
+                                        </td>
+
+                                        <td class="text-end text-muted">
+                                            <div class="d-flex flex-column align-items-end">
+                                                <span>S/ {{ item.precio_unitario|floatformat:2|intcomma }}</span>
+                                                <small style="font-size: 0.7rem;" class="text-muted">(Unitario)</small>
                                             </div>
                                         </td>
 
@@ -115,8 +166,6 @@
                                                 </button>
                                             </div>
                                         </td>
-
-                                        <td class="text-end text-muted">S/ {{ item.precio_unitario|floatformat:2|intcomma }}</td>
                                         
                                         <td class="text-end fw-bold text-dark pe-4">
                                             S/ <span id="subtotal-{{ item.key }}">{{ item.subtotal|floatformat:2|intcomma }}</span>
@@ -124,11 +173,11 @@
                                         
                                         <td class="text-end pe-3">
                                             <a href="#" 
-                                               class="btn btn-outline-danger btn-sm btn-eliminar" 
-                                               data-url="{% url 'eliminar_carrito' item.key %}" 
-                                               data-key="{{ item.key }}"
-                                               data-agotado="{% if not item.producto.esta_disponible %}true{% else %}false{% endif %}"
-                                               title="Eliminar ítem completo">
+                                            class="btn btn-outline-danger btn-sm btn-eliminar" 
+                                            data-url="{% url 'eliminar_carrito' item.key %}" 
+                                            data-key="{{ item.key }}"
+                                            data-agotado="{% if not item.producto.esta_disponible %}true{% else %}false{% endif %}"
+                                            title="Eliminar ítem completo">
                                                 <i class="fas fa-trash-alt"></i>
                                             </a>
                                         </td>
@@ -137,6 +186,7 @@
                             </tbody>
                         </table>
                     </div>
+
                 </div>
 
                 <div class="d-flex justify-content-between mt-3">
@@ -211,34 +261,28 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
-    const checkoutUrl = "{% url 'checkout' %}"; // Define la URL de checkout
-    const limpiarCarritoUrl = "{% url 'limpiar_carrito' %}"; // Define la URL para limpiar
+    const checkoutUrl = "{% url 'checkout' %}"; 
+    const limpiarCarritoUrl = "{% url 'limpiar_carrito' %}"; 
 
-    // Función auxiliar para formatear números a 2 decimales
     function formatNumber(number) {
         return parseFloat(number).toFixed(2);
     }
     
-    // ==========================================
-    // 1. MANEJO DE SUMAR Y RESTAR (+ / -)
-    // ==========================================
     const tablaCarrito = document.querySelector('.table');
 
     if (tablaCarrito) {
+        // 1. MANEJO DE SUMAR Y RESTAR
         tablaCarrito.addEventListener('click', function(e) {
             const btn = e.target.closest('.btn-update');
             if (btn) {
                 e.preventDefault();
-                // Validamos que el botón no esté deshabilitado por "agotado"
                 if (!btn.disabled) {
                     procesarPeticion(btn);
                 }
             }
         });
 
-        // ==========================================
-        // 2. MANEJO DE ELIMINAR (Bote de basura)
-        // ==========================================
+        // 2. MANEJO DE ELIMINAR
         tablaCarrito.addEventListener('click', function(e) {
             const btn = e.target.closest('.btn-eliminar');
             if (btn) {
@@ -246,10 +290,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const esAgotado = btn.getAttribute('data-agotado') === 'true';
 
                 if (esAgotado) {
-                    // CASO A: SI ESTÁ AGOTADO -> Eliminar directo (sin preguntar)
                     procesarPeticion(btn);
                 } else {
-                    // CASO B: SI ESTÁ DISPONIBLE -> Preguntar "¿Estás seguro?"
                     Swal.fire({
                         title: '¿Eliminar producto?',
                         text: "Se quitará este plato de tu carrito",
@@ -270,9 +312,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ==========================================
-    // 3. MANEJO DE VACIAR TODO EL CARRITO
-    // ==========================================
+    // 3. VACIAR TODO
     const btnLimpiar = document.getElementById('btn-limpiar-carrito');
     if (btnLimpiar) {
         btnLimpiar.addEventListener('click', function(e) {
@@ -289,31 +329,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Redireccionar a la vista de limpieza
                     window.location.href = limpiarCarritoUrl;
                 }
             });
         });
     }
 
-    // ==========================================
-    // 4. FUNCIÓN MAESTRA DE PETICIÓN (AJAX)
-    // ==========================================
+    // 4. PETICIÓN AJAX
     function procesarPeticion(btnElement) {
-        // Deshabilitar temporalmente el botón para evitar doble clic
         const originalText = btnElement.innerHTML;
         btnElement.disabled = true;
         btnElement.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>`;
 
-        // Obtenemos datos
         const url = btnElement.getAttribute('data-url');
         const itemKey = btnElement.getAttribute('data-key');
 
         fetch(url, {
-            method: 'GET', // Las vistas sumar/restar/eliminar usan GET por simplicidad.
+            method: 'GET',
             headers: { 
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': '{{ csrf_token }}' // CSRF es bueno incluso en GET en algunos entornos
+                'X-CSRFToken': '{{ csrf_token }}'
             }
         })
         .then(response => {
@@ -343,7 +378,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         })
         .finally(() => {
-            // Rehabilitamos botón si aún existe en el DOM
             if(document.body.contains(btnElement)) {
                 btnElement.disabled = false;
                 btnElement.innerHTML = originalText;
@@ -351,39 +385,31 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ==========================================
-    // 5. ACTUALIZACIÓN DE LA INTERFAZ (UI)
-    // ==========================================
+    // 5. ACTUALIZAR UI
     function actualizarUI(data, itemKey) {
-        
-        // A. Actualizar Totales Globales
         const badgeItems = document.getElementById('badge-total-items');
-        const cartCountNav = document.getElementById('cart-count'); // Asumiendo que existe en base.html
+        const cartCountNav = document.getElementById('cart-count');
         const totalGlobal = document.getElementById('total-global');
 
         if(badgeItems) badgeItems.innerText = data.total_items + ' items';
         if(cartCountNav) cartCountNav.innerText = data.total_items;
         if(totalGlobal) totalGlobal.innerText = formatNumber(data.total_global);
 
-        // B. Si hay que eliminar la fila visualmente
         if (data.eliminado) {
             const row = document.getElementById(`row-${itemKey}`);
             if (row) {
-                // Animación de desvanecimiento
                 row.style.transition = "all 0.4s ease-out";
                 row.style.transform = "translateX(20px)";
                 row.style.opacity = "0";
                 
                 setTimeout(() => {
                     row.remove();
-                    // Si el carrito queda vacío, recargamos
                     if (data.total_items === 0) {
                         location.reload();
                     }
                 }, 400);
             }
         } else {
-            // C. Si es solo actualización de cantidad
             const qtySpan = document.getElementById(`qty-${itemKey}`);
             const subtotalSpan = document.getElementById(`subtotal-${itemKey}`);
             
@@ -391,16 +417,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (subtotalSpan) subtotalSpan.innerText = formatNumber(data.subtotal);
         }
 
-        // D. GESTIÓN DEL BOTÓN DE PAGO y ALERTA DE AGOTADOS
         if (typeof data.hay_agotados !== 'undefined') {
             const alerta = document.getElementById('alerta-agotados');
             const btnPago = document.getElementById('checkout-button');
 
             if (data.hay_agotados === false) {
-                // CASO 1: YA NO HAY AGOTADOS -> DESBLOQUEAR
                 if (alerta) alerta.style.display = 'none';
                 if (btnPago) {
-                    // Reemplazar el botón deshabilitado por el link de pago
                     if (btnPago.tagName === 'BUTTON') {
                         const newBtn = document.createElement('a');
                         newBtn.id = 'checkout-button';
@@ -412,10 +435,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             } else {
-                // CASO 2: AÚN QUEDAN AGOTADOS -> BLOQUEAR
                 if (alerta) alerta.style.display = 'block';
                 if (btnPago) {
-                     // Reemplazar el link de pago por el botón deshabilitado
                     if (btnPago.tagName === 'A') {
                         const newBtn = document.createElement('button');
                         newBtn.id = 'checkout-button';

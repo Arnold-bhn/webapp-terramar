@@ -1,3 +1,13 @@
+<style>
+/* Animación de vibración para errores */
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(5px); }
+    50% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+    100% { transform: translateX(0); }
+}
+</style>
 {% load cart_tags %}
 {% for categoria in categorias %}
     {% if categoria.platos.exists %}
@@ -79,3 +89,90 @@
         No hay productos disponibles en esta categoría por el momento.
     </div>
 {% endfor %}
+
+
+<script>
+(function() {
+    // Función para mostrar/ocultar error en el sistema
+    function mostrarErrorModal(mensaje) {
+        const divError = document.getElementById('error-message-modal');
+        const txtError = document.getElementById('error-text');
+        if (divError && txtError) {
+            txtError.innerText = mensaje;
+            divError.classList.remove('d-none');
+            // Vibración ligera del modal para llamar la atención
+            const modalContent = divError.closest('.modal-content');
+            if (modalContent) {
+                modalContent.style.animation = "shake 0.3s";
+                setTimeout(() => modalContent.style.animation = "", 300);
+            }
+        }
+    }
+
+    document.addEventListener('change', function(e) {
+        const formModal = document.getElementById('form-modal-ajax');
+        if (!formModal) return;
+
+        // Ocultar error al empezar a interactuar
+        const divError = document.getElementById('error-message-modal');
+        if (divError) divError.classList.add('d-none');
+
+        const lblPrecioBase = document.getElementById('lbl-precio-base');
+        const precioBase = parseFloat(lblPrecioBase.getAttribute('data-valor')) || 0;
+        const spanPrecioTotal = document.getElementById('btn-precio-total');
+
+        if (e.target.classList.contains('form-check-input')) {
+            // Recalcular Precios
+            let precioActual = precioBase;
+            const seleccionados = formModal.querySelectorAll('input:checked');
+            seleccionados.forEach(input => {
+                const valorExtra = input.getAttribute('data-precio-extra').replace(',', '.');
+                precioActual += parseFloat(valorExtra) || 0;
+            });
+            if (spanPrecioTotal) {
+                spanPrecioTotal.innerText = precioActual.toLocaleString('es-PE', { minimumFractionDigits: 2 });
+            }
+
+            // Limpiar estilo de error del grupo actual
+            const contenedor = e.target.closest('.grupo-opciones-contenedor');
+            if (contenedor) {
+                contenedor.style.backgroundColor = "transparent";
+                contenedor.style.boxShadow = "none";
+            }
+        }
+    });
+
+    document.addEventListener('submit', function(e) {
+    const formModal = e.target.closest('#form-modal-ajax');
+    if (!formModal) return;
+
+    let todoValido = true;
+    const grupos = formModal.querySelectorAll('.grupo-opciones-contenedor[data-obligatorio="true"]');
+    const errorDiv = document.getElementById('error-message-modal');
+    const errorTxt = document.getElementById('error-text');
+
+    grupos.forEach(grupo => {
+        const seleccionado = grupo.querySelector('input:checked');
+        if (!seleccionado) {
+            todoValido = false;
+            // Resaltado visual del grupo faltante
+            grupo.style.backgroundColor = "#fff5f5";
+            grupo.style.padding = "10px";
+            grupo.style.borderRadius = "12px";
+            grupo.style.transition = "all 0.3s ease";
+        } else {
+            grupo.style.backgroundColor = "transparent";
+        }
+    });
+
+    if (!todoValido) {
+        e.preventDefault(); // Detiene el pedido
+        if (errorDiv && errorTxt) {
+            errorTxt.innerText = "Por favor selecciona las opciones requeridas para continuar.";
+            errorDiv.classList.remove('d-none');
+        }
+    }
+});
+})();
+</script>
+

@@ -121,21 +121,19 @@ def ajax_platos_by_marca(request, marca_slug):
 
 def modal_opciones(request, variante_id):
     """Vista para cargar el modal con opciones y precio base."""
-    variante = get_object_or_404(Variante, id=variante_id)
+    variante = get_object_or_404(Variante.objects.prefetch_related('inclusiones', 'grupos_opciones__opciones'), id=variante_id)
     
-    grupos = variante.grupos_opciones.filter(activo=True).prefetch_related('opciones')
+    #grupos = variante.grupos_opciones.filter(activo=True).prefetch_related('opciones')
 
     context = {
         'variante': variante,
-        'grupos': grupos,
+        'grupos': variante.grupos_opciones.filter(activo=True),
+        'inclusiones': variante.inclusiones.filter(activo=True),
     }
     return render(request, 'catalogo/modal_opciones.html', context)
 
 
 def agregar_carrito(request, variante_id):
-    """
-    Agrega un ítem al carrito, CALCULANDO el precio final en el SERVIDOR.
-    """
     carrito = Carrito(request)
     variante = get_object_or_404(Variante, id=variante_id)
 
@@ -144,37 +142,46 @@ def agregar_carrito(request, variante_id):
             return JsonResponse({'status': 'error','message': '¡Lo sentimos! Esta opción ya no está disponible.'})
         return redirect('menu')
 
-    precio_base = variante.precio 
-    opciones_seleccionadas = []
-    notas = ''
-    
     if request.method == 'POST':
+        # --- BLINDAJE DE SEGURIDAD: VALIDACIÓN DE OBLIGATORIOS ---
+        # Verificamos qué grupos son realmente obligatorios en la DB para esta variante
+        grupos_obligatorios = variante.grupos_opciones.filter(obligatorio=True, activo=True)
         
+        for grupo in grupos_obligatorios:
+            field_name = f'grupo_{grupo.id}'
+            # Si el ID del grupo no está en el POST o no tiene valor seleccionado
+            if field_name not in request.POST or not request.POST.get(field_name):
+                mensaje_error = f'Debes seleccionar una opción para: {grupo.nombre}'
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                    return JsonResponse({'status': 'error', 'message': mensaje_error})
+                return redirect('menu')
+
         # 1. Recopilar opciones seleccionadas
-        for key, value in request.POST.items():
+        opciones_seleccionadas = []
+        for key in request.POST:
             if key.startswith('grupo_'):
-                try:
-                    opciones_seleccionadas.append(int(value))
-                except (ValueError, TypeError):
-                    continue
+                valores = request.POST.getlist(key)
+                for val in valores:
+                    try:
+                        opciones_seleccionadas.append(int(val))
+                    except (ValueError, TypeError):
+                        continue
         
         notas = request.POST.get('notas', '').strip()
         
-        # 2. CÁLCULO DE PRECIO FINAL (BASE + OPCIONES EXTRA)
-        precio_final = precio_base 
-        
+        # 2. CÁLCULO DE PRECIO FINAL (Inmune a hacks de cliente)
+        precio_final = variante.precio 
         if opciones_seleccionadas:
-            opciones_extras = Opcion.objects.filter(
+            resultado = Opcion.objects.filter(
                 id__in=opciones_seleccionadas,
                 activo=True
-            ).aggregate(
-                total_extra=models.Sum('precio_extra')
-            )['total_extra']
+            ).aggregate(total_extra=models.Sum('precio_extra'))
             
+            opciones_extras = resultado.get('total_extra')
             if opciones_extras:
                 precio_final += opciones_extras
         
-        # 3. AGREGAR AL CARRITO con el precio_final CALCULADO por Python
+        # 3. AGREGAR AL CARRITO
         carrito.agregar(
             variante_id=variante.id, 
             precio_unitario=precio_final, 
@@ -184,7 +191,6 @@ def agregar_carrito(request, variante_id):
 
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         item_count = carrito.get_cantidad_de_variante(variante.id)
-        
         return JsonResponse({
             'status': 'ok',
             'cant_total': carrito.get_total_items(),
@@ -192,7 +198,6 @@ def agregar_carrito(request, variante_id):
         })
 
     return redirect('menu')
-
 
 def ver_carrito(request):
     """Vista de detalle del carrito."""
