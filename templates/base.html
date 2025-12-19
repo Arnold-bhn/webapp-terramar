@@ -11,12 +11,28 @@
     <style>
         /* Estilos Dinámicos (Marca Blanca) */
         :root {
-            --color-primary: {{ COLOR_PRINCIPAL|default:"#0d6efd" }};
+            --color-primary: {{ COLOR_PRINCIPAL|default:"#F25C05" }};
             --color-secondary: {{ COLOR_SECUNDARIO|default:"#6c757d" }};
+            
         }
         
-        body { background-color: #f8f9fa; }
+        :root {
+        --radius: 8px;
+        --shadow: 0 4px 12px rgba(0,0,0,.08);
+        }
+
         
+        /* 1. ESTO ELIMINA EL DESBORDE LATERAL */
+        html{
+            overflow-x: hidden; 
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #faf9f8;
+        }
+
+        body { background-color: #f8f9fa; }
+
         .bg-marca { background-color: var(--color-primary) !important; }
         .text-marca { color: var(--color-primary) !important; }
         .btn-marca { background-color: var(--color-secondary); color: white; border: none; }
@@ -34,7 +50,7 @@
 <body>
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-marca bg-dark fixed-top">
-        <div class="container">
+        <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="/">
                 <i class="fas fa-utensils me-2"></i>{{ MARCA.nombre|default:"Terramar" }}
             </a>
@@ -59,14 +75,14 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <div class="container my-4" style="min-height: 80vh;">
+    <div class="container-fluid p-0 my-4" style="min-height: 80vh;">
         {% block content %}
         {% endblock %}
     </div>
 
     <footer class="bg-dark text-white text-center py-3 mt-auto">
-        <div class="container">
-            <small>&copy; 2025 {{ MARCA.nombre }} - Sistema de Pedidos</small>
+        <div class="container-fluid">
+            <small>&copy; 2026 {{ MARCA.nombre }} - Sistema de Pedidos</small>
         </div>
     </footer>
 

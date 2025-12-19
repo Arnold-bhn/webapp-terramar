@@ -9,8 +9,8 @@ def informacion_marca(request):
     
     ctx = {
         'MARCA': marca,
-        'COLOR_PRINCIPAL': '#003366', # Default Azul
-        'COLOR_SECUNDARIO': '#FF6B4A', # Default Naranja
+        'COLOR_PRINCIPAL': "#0B3C5D", # Default Azul
+        'COLOR_SECUNDARIO': '#1CA7EC', # Default Naranja
         'TEMA_CSS': 'DEFAULT',
         'MENSAJE_TOP': ''
     }

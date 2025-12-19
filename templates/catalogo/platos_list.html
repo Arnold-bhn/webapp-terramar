@@ -65,9 +65,11 @@
                                                         Personalizar <i class="fas fa-sliders-h ms-1"></i>
                                                     </button>
                                                 {% else %}
-                                                    <form action="{% url 'agregar_carrito' variante.id %}" method="POST" class="form-ajax-directo m-0">
+                                                    <form  method="POST" class="form-ajax-directo m-0">
                                                         {% csrf_token %}
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold">
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold" 
+                                                        data-url="{% url 'cargar_modal_opciones' variante.id %}"
+                                                        onclick="abrirModal(this.getAttribute('data-url'))">
                                                             Agregar <i class="fas fa-plus"></i>
                                                         </button>
                                                     </form>

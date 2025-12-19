@@ -1,72 +1,151 @@
-{% load humanize %}
-{% load cart_tags %}
+<div id="sidebar-carrito">
+    {% load static %}
+    {% load humanize %}
 
-<div class="offcanvas-header border-bottom">
-    <h5 class="offcanvas-title fw-bold" id="offcanvasRightLabel">
-        <i class="fas fa-shopping-bag me-2"></i>Tu Pedido
-    </h5>
-    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-</div>
-
-<div class="offcanvas-body p-0 d-flex flex-column h-100">
-    
-    {% if carrito|length == 0 %}
-        <div class="d-flex flex-column align-items-center justify-content-center h-50 text-muted">
-            <i class="fas fa-shopping-basket fa-3x mb-3 opacity-50"></i>
-            <p>Tu carrito está vacío</p>
-            <button class="btn btn-outline-primary btn-sm rounded-pill" data-bs-dismiss="offcanvas">
-                Ver Menú
-            </button>
+    <div class="bg-danger text-white p-3 d-flex align-items-center justify-content-between shadow-sm">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-shopping-basket me-2"></i>
+            <h6 class="mb-0 fw-bold">TU PEDIDO</h6>
         </div>
-    {% else %}
+        <span class="badge bg-white text-danger rounded-pill fw-bold">{{ carrito.get_total_items }}</span>
+    </div>
+
+    <div class="flex-grow-1 p-2 overflow-auto bg-light" style="max-height: calc(100vh - 200px);">
         
-        <div class="flex-grow-1 overflow-auto p-3">
-            {% for key, item in carrito.carrito.items %}
-                <div class="card mb-3 border-0 shadow-sm bg-light">
-                    <div class="card-body p-2">
-                        <div class="d-flex justify-content-between">
-                            <div class="me-2">
-                                <h6 class="mb-0 fw-bold small">{{ item.nombre }}</h6>
-                                {% if item.notas %}
-                                    <small class="text-muted d-block fst-italic" style="font-size: 0.75rem;">
-                                        Nota: {{ item.notas|truncatechars:20 }}
-                                    </small>
-                                {% endif %}
-                                <div class="text-primary fw-bold mt-1 small">
-                                    S/ {{ item.precio_unitario|floatformat:2|intcomma }}
-                                </div>
-                            </div>
+        
+            <div class="d-flex flex-column gap-2">
+                {% for item in carrito.iterar_detalles %}
+                
+                    <div class="card border-0 shadow-sm position-relative {% if not item.producto.esta_disponible %}opacity-75{% endif %}">
+                        
+                    
+
+                        <a href="#" 
+                            onclick="eliminarItem(event, this)"  class="btn btn-sm text-muted position-absolute top-0 end-0 p-2 btn-outline-danger btn-sm btn-eliminar" 
+                            data-url="{% url 'eliminar_carrito' item.key %}" 
+                            data-key="{{ item.key }}"
+                            data-agotado="{% if not item.producto.esta_disponible %}true{% else %}false{% endif %}"
+                            title="Eliminar ítem completo">
+                            <i class="fas fa-trash-alt"></i>
+                        </a>
+
+
+                        <div class="card-body p-2">
+                            <div class="d-flex justify-content-between pe-4 mb-1">
+                                <span class="fw-bold text-dark lh-sm" style="font-size: 0.95rem;">
+                                    {{ item.producto.plato.nombre }}
+                                    <small class="text-muted fw-normal d-block" style="font-size: 0.75rem;">{{ item.producto.nombre }} <strong>S/ {{ item.producto.precio|floatformat:2 }}</strong></small>
+                                    
+                                </span>
                             
-                            <div class="d-flex flex-column align-items-end justify-content-between">
-                                <button class="btn btn-sm text-danger p-0 mb-1 btn-eliminar-sidebar" data-url="{% url 'eliminar_carrito' key %}">
-                                    <i class="fas fa-trash-alt fa-xs"></i>
-                                </button>
+                            </div>
+
+                            <div class="mb-2 border-start border-3 ps-2 ms-1" style="border-color: #e9ecef!important;">
                                 
-                                <div class="input-group input-group-sm" style="width: 80px;">
-                                    <button class="btn btn-white border px-2 btn-restar-sidebar" data-url="{% url 'restar_plato' key %}">-</button>
-                                    <input type="text" class="form-control text-center p-0 bg-white border-top border-bottom" value="{{ item.cantidad }}" readonly style="font-size: 0.85rem;">
-                                    <button class="btn btn-white border px-2 btn-sumar-sidebar" data-url="{% url 'sumar_plato' key %}">+</button>
+                                {% if item.producto.inclusiones.all %}
+                                    <div class="text-muted fst-italic mb-1" style="font-size: 0.7rem; line-height: 1.2;"> 
+                                        {% for inc in item.producto.inclusiones.all %}
+                                            {{ inc.nombre }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+
+                                {% if item.opciones_detalles %}
+                                    <ul class="list-unstyled mb-0" style="font-size: 0.7rem;">
+                                        {% for opcion in item.opciones_detalles %}
+                                            <li class="d-flex justify-content-between text-secondary">
+                                                <span>
+                                                    {{ opcion.nombre }}
+                                                </span>
+                                                {% if opcion.precio > 0 %}
+                                                    <span class="text-primary ms-1">+{{ opcion.precio|floatformat:2 }}</span>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                                
+                                {% if item.notas %}
+                                    <div class="text-muted mt-1" style="font-size: 0.7rem;">
+                                        <i class="fas fa-pen-alt me-1"></i>"{{ item.notas|truncatechars:30 }}"
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                                
+                                <div class="btn-group btn-group-sm rounded-pill border" role="group">
+                                    <button 
+                                        class="btn btn-outline-secondary btn-sm btn-update" 
+                                        data-action="restar" 
+                                        data-key="{{ item.key }}"
+                                        data-url="{% url 'restar_plato' item.key %}"
+                                        {% if not item.producto.esta_disponible %}disabled{% endif %}>
+                                        <i class="fas fa-minus small"></i>
+                                    </button>
+                                    <span class="bg-white px-2 py-0 d-flex align-items-center fw-bold text-dark small">
+                                        {{ item.cantidad }}
+                                    </span>
+                                    <button 
+                                        class="btn btn-outline-secondary btn-sm btn-update" 
+                                        data-action="sumar" 
+                                        data-key="{{ item.key }}"
+                                        data-url="{% url 'sumar_plato' item.key %}"
+                                        {% if not item.producto.esta_disponible %}disabled{% endif %}>
+                                        <i class="fas fa-plus small"></i>
+                                    </button>
                                 </div>
+
+                                <div class="text-end">
+                                    {% if not item.producto.esta_disponible %}
+                                        <span class="badge bg-danger" style="font-size: 0.6rem;">AGOTADO</span>
+                                    {% else %}
+                                        <span class="fw-bold text-dark">S/ {{ item.subtotal|floatformat:2|intcomma }}</span>
+                                    {% endif %}
+                                </div>
+
                             </div>
                         </div>
                     </div>
-                </div>
-            {% endfor %}
-        </div>
-
-        <div class="p-3 bg-white border-top shadow-lg mt-auto">
-            <div class="d-flex justify-content-between mb-3 align-items-center">
-                <span class="text-muted small">Total a pagar:</span>
-                <span class="fs-4 fw-bold text-dark">S/ {{ carrito.get_total_precio|floatformat:2|intcomma }}</span>
+                {% endfor %}
             </div>
-            
-            <a href="{% url 'ver_carrito' %}" class="btn btn-primary w-100 rounded-pill py-2 fw-bold mb-2">
-                IR A PAGAR
-            </a>
-            <button class="btn btn-outline-secondary w-100 rounded-pill py-1 btn-sm" data-bs-dismiss="offcanvas">
-                Seguir pidiendo
-            </button>
+
+        
+
+    </div>
+
+    <div class="p-3 border-top bg-white shadow-lg z-index-1">
+        
+        {% if hay_agotados %}
+            <div class="alert alert-danger p-1 mb-2 text-center" style="font-size: 0.7rem;">
+                <i class="fas fa-exclamation-circle"></i> Quita los productos agotados
+            </div>
+        {% endif %}
+
+        <div class="d-flex justify-content-between align-items-end mb-2">
+            <span class="text-muted small">Total a pagar</span>
+            <h4 class="fw-bold text-dark mb-0">S/ {{ carrito.get_total_precio|floatformat:2|intcomma }}</h4>
         </div>
 
-    {% endif %}
+        {% if hay_agotados %}
+            <button class="btn btn-secondary w-100 py-2 rounded-3 fw-bold disabled" disabled>
+                <i class="fas fa-lock me-2"></i> CONTINUAR
+            </button>
+        {% else %}
+            {% if carrito.get_total_items > 0 %}
+                <button onclick="window.location.href=''" 
+                        class="btn btn-danger w-100 py-2 rounded-3 fw-bold shadow-sm custom-hover-btn">
+                    CONTINUAR <i class="fas fa-arrow-right ms-2"></i>
+                </button>
+            {% else %}
+                <button class="btn btn-light text-muted w-100 py-2 rounded-3 fw-bold" disabled>
+                    ESPERANDO PEDIDO...
+                </button>
+            {% endif %}
+        {% endif %}
+        
+        <div class="text-center mt-2">
+            <small style="font-size: 0.6rem;" class="text-muted text-uppercase ls-1">Delivery & Recojo</small>
+        </div>
+    </div>
 </div>

@@ -1,20 +1,21 @@
 {% extends 'base.html' %}
-{% load cart_tags %} 
+{% load cart_tags %}
 
 {% block content %}
+
     <style>
-        /* Estilos visuales bonitos */
+        /* Estilos visuales */
         .img-agotada { filter: grayscale(100%); opacity: 0.6; }
         
-        .marcas-sticky-panel { 
-            position: sticky; top: 50px; z-index: 1040; 
-            background-color: #f8f9fa; padding: 10px 0; 
+        .marcas-sticky-panel {
+            position: sticky; top: 50px; z-index: 1040;
+            background-color: #fafaf8; padding: 10px 0;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             border-bottom: 1px solid #dee2e6;
         }
         
         .btn-marca-custom {
-            border-radius: 50rem; margin: 0 5px; border: 1px solid #dee2e6; 
+            border-radius: 50rem; margin: 0 5px; border: 1px solid #dee2e6;
             background: white; color: #6c757d; font-weight: 600; padding: 8px 18px;
             transition: all 0.2s ease;
         }
@@ -23,46 +24,84 @@
             transform: scale(1.05);
             box-shadow: 0 2px 5px rgba(13, 110, 253, 0.3);
         }
-        .btn-marca-custom:hover:not(.activo) { background-color: #e9ecef; }
         
-        /* Ajuste para el contenido */
         #platos-container { min-height: 500px; transition: opacity 0.2s ease; }
+
+        /* --- LAYOUT PROTEGIDO --- */
+        .row.g-0 {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: flex-start;
+        }
+
+        /* TICKET FIJO LATERAL */
+        #col-ticket {
+            position: -webkit-sticky !important;
+            position: sticky !important;
+            top: 100px !important; 
+            height: calc(100vh - 70px) !important;
+            overflow-y: auto !important;
+            align-self: flex-start !important;
+        }
+
+        #col-carta {
+            transition: width 0.3s ease;
+        }
+
+        /* Estilo para el modal para asegurar que se vea como en tu captura */
+        .modal-content {
+            border-radius: 15px;
+            border: none;
+            overflow: hidden;
+        }
     </style>
 
-    <div id="data-carrito-inicial" data-carrito='
-    {% if carrito_data_json %}
-            {{ carrito_data_json|safe }}
-        {% else %}
-            {}
-        {% endif %}
-    '></div>
+    <div id="data-carrito-inicial" data-carrito='{{ carrito_data_json|safe|default:"{}" }}'></div>
 
-    <div class="container mt-5 pt-4">
-        <div class="text-center mb-4 mt-4"> 
-            <h1 class="display-6 fw-bold text-secondary">Nuestra Carta</h1>
-        </div>
-
-        <div class="marcas-sticky-panel mb-4"> 
-            <div class="d-flex justify-content-center flex-wrap" id="contenedor-marcas">
-                {% for m in todas_marcas %}
-                    <button type="button" 
-                            class="btn-marca-custom {% if marca_actual and m.id == marca_actual.id %}activo{% endif %}"
-                            id="btn-marca-{{ m.slug }}"
-                            onclick="cargarMarca(event, '{{ m.slug }}')">
-                        {{ m.nombre|upper }}
-                    </button>
-                {% endfor %}
+    <div class="container-fluid p-0 mt-5 pt-2">
+        <div class="row g-0">
+            <div id="col-carta" class="col-md-12 p-4 transition-all">
+                <div class="text-center mb-4 mt-4">
+                    <h1 class="display-6 fw-bold text-secondary">Nuestra Carta</h1>
+                </div>
+                <div class="marcas-sticky-panel mb-4">
+                    <div class="d-flex justify-content-center flex-wrap" id="contenedor-marcas">
+                        {% for m in todas_marcas %}
+                            <button type="button"
+                                    class="btn-marca-custom {% if marca_actual and m.id == marca_actual.id %}activo{% endif %}"
+                                    id="btn-marca-{{ m.slug }}"
+                                    onclick="cargarMarca(event, '{{ m.slug }}')">
+                                {{ m.nombre|upper }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div id="platos-container">
+                    {% include 'catalogo/platos_list.html' %}
+                </div>
             </div>
-        </div>
 
-        <div id="platos-container">
-            {% include 'catalogo/platos_list.html' %} 
+            <div id="col-ticket" class="col-md-3 d-none border-start shadow-lg bg-white">
+                <div class="d-flex flex-column h-100">
+                    <div class="card-body p-0 d-flex flex-column" id="ticket-fijo-content">
+                        {% if carrito.get_total_items > 0 %}
+                            {% include 'pedidos/carrito_sidebar.html' %}
+                        {% else %}
+                            <div class="h-100 d-flex flex-column align-items-center justify-content-center text-center opacity-50">
+                                <i class="fas fa-receipt fa-4x mb-3 text-secondary"></i>
+                                <p class="small text-muted">Tu ticket está vacío</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="modal fade" id="modalUniversal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="modalOpciones" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content" id="contenidoModal"></div>
+            <div class="modal-content shadow-lg" id="contenido-personalizar-bloque">
+                </div>
         </div>
     </div>
 
@@ -78,154 +117,101 @@
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-        // === 1. MEMORIA DE SCROLL Y ESTADO ===
-        const scrollMemory = {}; 
+        const scrollMemory = {};
         let marcaActualSlug = "{{ marca_actual.slug|default:'' }}";
+        let modalBS = null; // Instancia del modal de Bootstrap
 
-        // Función auxiliar para actualizar visualmente todos los badges de la marca
-        function actualizarBadgesMarca(carritoData) {
+        // Mantiene los badges actualizados sin romper nada
+        function actualizarBadgesMarca(carritoData, esCargaInicial = false) {
             document.querySelectorAll('[id^="badge-"]').forEach(badge => {
                 const varianteId = badge.id.split('-')[1];
-                const cantidad = carritoData[varianteId] || 0; 
-
-                badge.innerText = cantidad;
-                
-                if (cantidad > 0) {
+                const cantidadActual = parseInt(badge.innerText) || 0;
+                const nuevaCantidad = carritoData[varianteId] || 0;
+                if (nuevaCantidad > 0) {
+                    badge.innerText = nuevaCantidad;
                     badge.classList.remove('d-none');
                     badge.classList.add('bg-dark');
+                    if (nuevaCantidad !== cantidadActual && !esCargaInicial) {
+                        badge.classList.remove('badge-bounce');
+                        void badge.offsetWidth; 
+                        badge.classList.add('badge-bounce');
+                    }
                 } else {
                     badge.classList.add('d-none');
-                    badge.classList.remove('bg-dark');
+                    badge.innerText = 0;
                 }
             });
         }
 
-        // Función para cambiar de marca (Tab - AJAX)
+        // Simplificado: Solo maneja Carta y Ticket
+        function actualizarVistaColumnas() {
+            const colCarta = document.getElementById('col-carta');
+            const colTicket = document.getElementById('col-ticket');
+            const cartCount = document.getElementById('cart-count');
+            const cantItems = cartCount ? parseInt(cartCount.innerText) : 0;
+
+            if (cantItems > 0) {
+                colTicket.classList.remove('d-none');
+                colCarta.classList.replace('col-md-12', 'col-md-9');
+            } else {
+                colTicket.classList.add('d-none');
+                colCarta.classList.replace('col-md-9', 'col-md-12');
+            }
+        }
+
         function cargarMarca(e, slug) {
             e.preventDefault();
-            
-            if (marcaActualSlug) {
-                scrollMemory[marcaActualSlug] = window.scrollY;
-            }
-
+            if (marcaActualSlug) { scrollMemory[marcaActualSlug] = window.scrollY; }
             document.querySelectorAll('.btn-marca-custom').forEach(b => b.classList.remove('activo'));
             const btn = document.getElementById('btn-marca-' + slug);
             if(btn) btn.classList.add('activo');
-
             const container = document.getElementById('platos-container');
-            container.style.opacity = '0.4'; 
-
+            container.style.opacity = '0.4';
             fetch(`/ajax/platos/${slug}/`)
-                .then(r => r.json()) 
+                .then(r => r.json())
                 .then(data => {
-                    // 1. Inyectamos el HTML
-                    container.innerHTML = data.html; 
+                    container.innerHTML = data.html;
                     container.style.opacity = '1';
-                    
-                    // 2. ACTUALIZACIÓN CRÍTICA AJAX: Forzamos el estado visual con los datos del JSON
-                    if (data.carrito_data) {
-                        actualizarBadgesMarca(data.carrito_data);
-                    }
-                    
-                    // 3. Actualizar contador global del carrito
+                    if (data.carrito_data) actualizarBadgesMarca(data.carrito_data);
                     const cartCount = document.getElementById('cart-count');
-                    if(cartCount) { 
-                        cartCount.innerText = data.cart_count; 
-                        if(data.cart_count > 0) {
-                            cartCount.classList.remove('d-none');
-                        } else {
-                            cartCount.classList.add('d-none');
-                        }
+                    if(cartCount) {
+                        cartCount.innerText = data.cart_count;
+                        data.cart_count > 0 ? cartCount.classList.remove('d-none') : cartCount.classList.add('d-none');
                     }
-
-                    // 4. Reactivar formularios y scroll
                     activarFormulariosDirectos();
                     marcaActualSlug = slug;
-                    sessionStorage.setItem('marcaActiva', slug); 
-
-                    if (scrollMemory[slug] !== undefined) {
-                        window.scrollTo({ top: scrollMemory[slug], behavior: 'auto' });
-                    } else {
-                        const offset = container.offsetTop - 140; 
+                    sessionStorage.setItem('marcaActiva', slug);
+                    if (scrollMemory[slug] !== undefined) { window.scrollTo({ top: scrollMemory[slug], behavior: 'auto' }); } 
+                    else {
+                        const offset = container.offsetTop - 140;
                         window.scrollTo({ top: offset > 0 ? offset : 0, behavior: 'smooth' });
                     }
-                })
-                .catch(err => {
-                    console.error(err);
+                    actualizarVistaColumnas();
                 });
         }
 
-        // --- SOLUCIÓN DE PERSISTENCIA AL CARGAR LA PÁGINA (Regreso del Carrito) ---
-        document.addEventListener('DOMContentLoaded', function() {
-            activarFormulariosDirectos();
-            
-            // 1. LECTURA CRÍTICA DE DATOS: Leemos el JSON del atributo data-
-            const dataElement = document.getElementById('data-carrito-inicial');
-            
-            if (dataElement) {
-                try {
-                    // Leemos el string del atributo 'data-carrito'
-                    const carritoDataString = dataElement.getAttribute('data-carrito').trim();
-                    
-                    if (carritoDataString && carritoDataString !== '{}') {
-                        // Usamos JSON.parse para convertir el string JSON limpio a un objeto JS
-                        const carritoDataInicial = JSON.parse(carritoDataString); 
-                        
-                        if (Object.keys(carritoDataInicial).length > 0) {
-                            actualizarBadgesMarca(carritoDataInicial);
-                        }
-                    }
-                } catch (e) {
-                    console.error("Error al parsear el carrito_data inicial:", e);
-                }
-            }
-
-
-            // 2. Lógica para activar la última marca (memoria de navegación)
-            const lastMarca = sessionStorage.getItem('marcaActiva');
-            if(lastMarca && lastMarca !== "{{ marca_actual.slug }}" && lastMarca !== "undefined") {
-                const btn = document.getElementById('btn-marca-' + lastMarca);
-                if(btn) btn.click();
-            }
-        });
-        // --- FIN DE LA SOLUCIÓN DE PERSISTENCIA AL CARGAR LA PÁGINA ---
-
-        // === 2. ABRIR MODAL (Sin cambios funcionales) ===
+        // RE-INSTALACIÓN DEL MODAL CENTRADO
         function abrirModal(url) {
-            const modalEl = document.getElementById('modalUniversal');
-            const contenido = document.getElementById('contenidoModal');
+            const contenedor = document.getElementById('contenido-personalizar-bloque');
+            const modalElement = document.getElementById('modalOpciones');
             
-            contenido.innerHTML = '<div class="p-5 text-center"><div class="spinner-border text-primary"></div></div>';
-            const modalBS = new bootstrap.Modal(modalEl);
+            if (!modalBS) modalBS = new bootstrap.Modal(modalElement);
+
+            contenedor.innerHTML = '<div class="p-5 text-center"><div class="spinner-border text-primary"></div></div>';
             modalBS.show();
 
-            fetch(url)
-                .then(r => r.text())
-                .then(html => {
-                    contenido.innerHTML = html;
-                    const form = document.getElementById('form-modal-ajax');
-                    if (form) conectarFormularioAjax(form, modalBS);
-                })
-                .catch(err => {
-                    console.error(err);
-                    contenido.innerHTML = '<div class="alert alert-danger m-3">Error al cargar opciones</div>';
-                });
+            fetch(url).then(r => r.text()).then(html => {
+                contenedor.innerHTML = html;
+                const form = document.getElementById('form-modal-ajax');
+                if (form) conectarFormularioAjax(form);
+            });
         }
 
-        // === 3. LOGICA AJAX FORMULARIOS (Sin cambios funcionales) ===
-        function conectarFormularioAjax(form, modalInstance = null) {
+        function conectarFormularioAjax(form) {
             form.addEventListener('submit', function (e) {
-                e.preventDefault(); 
-                
+                e.preventDefault();
                 const btn = this.querySelector('button[type="submit"]');
-                const originalText = btn.innerHTML;
                 btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
-                
-                const formActionUrl = this.action;
-                const varianteIdMatch = formActionUrl.match(/\/(\d+)\/$/);
-                const varianteId = varianteIdMatch ? varianteIdMatch[1] : null;
-
                 fetch(this.action, {
                     method: 'POST',
                     body: new FormData(this),
@@ -234,64 +220,93 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.status === 'ok') {
-                        if (modalInstance) modalInstance.hide();
-                        
-                        // 1. Actualizar contador global del carrito
+                        // Cerramos el modal si existe la instancia
+                        if (modalBS) modalBS.hide();
+
+                        document.getElementById('ticket-fijo-content').innerHTML = data.html_ticket;
                         const cartCount = document.getElementById('cart-count');
-                        if(cartCount) { 
-                            cartCount.innerText = data.cant_total; 
-                            if(data.cant_total > 0) {
-                                cartCount.classList.remove('d-none');
-                            } else {
-                                cartCount.classList.add('d-none');
-                            }
-                        }
+                        if (cartCount) { cartCount.innerText = data.cant_total; cartCount.classList.remove('d-none'); }
                         
-                        // 2. ACTUALIZACIÓN CRÍTICA DEL BADGE NEGRO
-                        if(varianteId) {
-                            const badge = document.getElementById('badge-' + varianteId);
-                            
-                            if(badge) { 
-                                badge.innerText = data.cant_producto; 
-                                
-                                if(data.cant_producto > 0) {
-                                    badge.classList.remove('d-none');
-                                    badge.classList.remove('bg-dark'); 
-                                    
-                                    badge.classList.add('bg-success');
-                                    setTimeout(() => {
-                                        badge.classList.remove('bg-success');
-                                        badge.classList.add('bg-dark'); 
-                                    }, 1000);
-
-                                } else {
-                                    badge.classList.add('d-none');
-                                }
+                        if(data.variante_id) {
+                            const badgeNegro = document.getElementById(`badge-${data.variante_id}`);
+                            if (badgeNegro) {
+                                badgeNegro.innerText = data.cant_producto;
+                                badgeNegro.classList.remove('d-none');
+                                badgeNegro.classList.add('bg-dark');
                             }
                         }
-
-                        // 3. Mostrar la notificación Toast
-                        const toast = new bootstrap.Toast(document.getElementById('liveToast'));
-                        toast.show();
-                    } else {
-                        Swal.fire('Atención', data.message || 'Error desconocido', 'warning');
+                        actualizarVistaColumnas();
+                        const toastEl = document.getElementById('liveToast');
+                        if (toastEl) new bootstrap.Toast(toastEl).show();
                     }
                 })
-                .catch(err => {
-                    console.error(err);
-                    Swal.fire('Error', 'Ocurrió un error de conexión o servidor.', 'error');
-                })
-                .finally(() => {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                });
+                .finally(() => btn.disabled = false);
             });
         }
 
+        // Mantener las demás funciones (activarFormulariosDirectos, eliminarItem, btn-update) intactas
         function activarFormulariosDirectos() {
-            document.querySelectorAll('.form-ajax-directo').forEach(form => {
-                conectarFormularioAjax(form);
+            document.querySelectorAll('.form-ajax-directo').forEach(form => conectarFormularioAjax(form));
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            activarFormulariosDirectos();
+            const dataDiv = document.getElementById('data-carrito-inicial');
+            if (dataDiv) {
+                try {
+                    const carritoInicial = JSON.parse(dataDiv.dataset.carrito);
+                    actualizarBadgesMarca(carritoInicial, true);
+                } catch (e) { console.error("Error al parsear el carrito", e); }
+            }
+            actualizarVistaColumnas();
+        });
+
+        function eliminarItem(event, elemento) {
+            event.preventDefault();
+            const url = elemento.dataset.url;
+            const ticketContainer = document.getElementById('ticket-fijo-content');
+            if(ticketContainer) ticketContainer.style.opacity = '0.5';
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    ticketContainer.style.opacity = '1';
+                    ticketContainer.innerHTML = data.html_ticket;
+                    const cartCount = document.getElementById('cart-count');
+                    if(cartCount) {
+                        cartCount.innerText = data.cant_total;
+                        data.cant_total > 0 ? cartCount.classList.remove('d-none') : cartCount.classList.add('d-none');
+                    }
+                    if (data.carrito_data) actualizarBadgesMarca(data.carrito_data);
+                    actualizarVistaColumnas();
+                }
             });
         }
+
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn-update');
+            if (!btn) return;
+            e.preventDefault();
+            const url = btn.getAttribute('data-url');
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    const contenedorTicket = document.getElementById('ticket-fijo-content');
+                    if (contenedorTicket && data.html_ticket) { contenedorTicket.innerHTML = data.html_ticket; }
+                    const badgeNegro = document.getElementById(`badge-${data.variante_id}`);
+                    if (badgeNegro) {
+                        badgeNegro.innerText = data.cant_producto;
+                        parseInt(data.cant_producto) > 0 ? badgeNegro.classList.remove('d-none') : badgeNegro.classList.add('d-none');
+                    }
+                    const cartCount = document.getElementById('cart-count');
+                    if(cartCount) {
+                        cartCount.innerText = data.total_items;
+                        data.total_items > 0 ? cartCount.classList.remove('d-none') : cartCount.classList.add('d-none');
+                    }
+                    actualizarVistaColumnas();
+                }
+            });
+        });
     </script>
 {% endblock %}

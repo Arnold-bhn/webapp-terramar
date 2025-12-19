@@ -191,10 +191,13 @@ def agregar_carrito(request, variante_id):
 
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         item_count = carrito.get_cantidad_de_variante(variante.id)
+        html_ticket = render_to_string('pedidos/carrito_sidebar.html', {'carrito': carrito}, request=request)
         return JsonResponse({
             'status': 'ok',
             'cant_total': carrito.get_total_items(),
-            'cant_producto': item_count
+            'html_ticket': html_ticket,
+            'cant_producto': item_count,
+            'variante_id': variante.id
         })
 
     return redirect('menu')
@@ -235,20 +238,30 @@ def sumar_plato(request, item_key):
         cantidad = item['cantidad']
         precio_unitario = Decimal(item['precio_unitario'])
         subtotal = precio_unitario * cantidad
-        
+
+        # --- AGREGADO SOLO LO NECESARIO ---
+        html_ticket = render_to_string('pedidos/carrito_sidebar.html', {'carrito': carrito}, request=request)
+        # Obtenemos la cantidad total de esta variante específica para el "badge negrito"
+        cant_producto = carrito.get_cantidad_de_variante(variante_id)
+        # ----------------------------------
         return JsonResponse({
             'status': 'ok',
             'cantidad': cantidad,
             'subtotal': float(subtotal), 
             'total_global': float(carrito.get_total_precio()),
             'total_items': carrito.get_total_items(),
-            'eliminado': False
+            'eliminado': False,
+            'html_ticket': html_ticket, 
+            'variante_id': variante_id,
+            'cant_producto': cant_producto
         })
     return redirect('ver_carrito')
 
 
 def restar_plato(request, item_key):
     carrito = Carrito(request)
+    item_antes = carrito.carrito.get(item_key)
+    variante_id_antes = item_antes['variante_id'] if item_antes else None
     carrito.restar(item_key) 
     
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
@@ -264,7 +277,13 @@ def restar_plato(request, item_key):
             precio_unitario = Decimal(item['precio_unitario'])
             subtotal = precio_unitario * cantidad
             hay_agotados_despues = False
-
+        
+        html_ticket = render_to_string('pedidos/carrito_sidebar.html', {'carrito': carrito}, request=request)
+        # Calculamos cuánto queda del producto para el "badge negrito"
+        cant_producto = 0
+        if variante_id_antes:
+             cant_producto = carrito.get_cantidad_de_variante(variante_id_antes)
+        # ----------------------------------
         return JsonResponse({
             'status': 'ok',
             'cantidad': cantidad,
@@ -272,26 +291,47 @@ def restar_plato(request, item_key):
             'total_global': float(carrito.get_total_precio()),
             'total_items': carrito.get_total_items(),
             'eliminado': eliminado,
-            'hay_agotados': hay_agotados_despues 
+            'hay_agotados': hay_agotados_despues,
+            'html_ticket': html_ticket,
+            'variante_id': variante_id_antes,
+            'cant_producto': cant_producto
         })
     return redirect('ver_carrito')
 
 
 def eliminar_carrito(request, item_key):
     carrito = Carrito(request)
+    item = carrito.carrito.get(item_key)
+    variante_id = item['variante_id'] if item else None
     carrito.eliminar(item_key) 
     
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         sigue_bloqueado = check_hay_agotados(carrito)
+        html_ticket = render_to_string('pedidos/carrito_sidebar.html', {'carrito': carrito}, request=request)
         
+        # OBTENEMOS EL DICCIONARIO ACTUALIZADO DE CANTIDADES {variante_id: cantidad}
+        # Usamos tu función auxiliar que ya existe
+        carrito_data_str = generar_carrito_data_js(carrito) 
+        cant_producto_restante = 0
+        if variante_id:
+            cant_producto_restante = carrito.get_cantidad_de_variante(variante_id)
+
         return JsonResponse({
             'status': 'ok',
+            'cant_total': carrito.get_total_items(),
             'total_global': float(carrito.get_total_precio()),
+            'html_ticket': html_ticket,
             'total_items': carrito.get_total_items(),
             'eliminado': True,
-            'hay_agotados': sigue_bloqueado
+            'variante_id': variante_id,
+            'hay_agotados': sigue_bloqueado,
+            # Enviamos el diccionario real para que JS refresque todos los badges
+            'carrito_data': json.loads(carrito_data_str),
+            'cant_producto': cant_producto_restante
+
         })
     return redirect('ver_carrito')
+
 
 
 def limpiar_carrito(request):
