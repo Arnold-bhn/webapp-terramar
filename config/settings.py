@@ -289,5 +289,12 @@ ADMIN_REORDER = (
 )
 
 
+
+
+# settings.py
+SESSION_COOKIE_HTTPONLY = True  # Impide que JavaScript acceda a la sesión
+SESSION_COOKIE_SECURE = True    # Solo envía la cookie por HTTPS
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True # La sesión muere al cerrar el navegador (ideal para comida)
+
 CART_SESSION_ID = 'carrito' 
 #STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')

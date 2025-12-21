@@ -28,6 +28,15 @@
                             title="Eliminar ítem completo">
                             <i class="fas fa-trash-alt"></i>
                         </a>
+                        
+                        <a href="javascript:void(0)" 
+                            onclick="eliminarItem(event, this)" 
+                            class="btn btn-sm text-muted position-absolute top-0 end-0 p-2 btn-outline-danger btn-eliminar" 
+                            data-url="{% url 'eliminar_carrito' item.key %}" 
+                            data-key="{{ item.key }}"
+                            title="Eliminar ítem completo">
+                            <i class="fas fa-trash-alt"></i>
+                        </a>
 
 
                         <div class="card-body p-2">
@@ -94,6 +103,7 @@
                                         {% if not item.producto.esta_disponible %}disabled{% endif %}>
                                         <i class="fas fa-plus small"></i>
                                     </button>
+                                    
                                 </div>
 
                                 <div class="text-end">

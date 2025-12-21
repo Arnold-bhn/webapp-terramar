@@ -172,14 +172,15 @@
                                         </td>
                                         
                                         <td class="text-end pe-3">
-                                            <a href="#" 
-                                            class="btn btn-outline-danger btn-sm btn-eliminar" 
-                                            data-url="{% url 'eliminar_carrito' item.key %}" 
-                                            data-key="{{ item.key }}"
-                                            data-agotado="{% if not item.producto.esta_disponible %}true{% else %}false{% endif %}"
-                                            title="Eliminar ítem completo">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </a>
+                                            <button
+                                                class="btn btn-outline-danger btn-sm btn-eliminar" 
+                                                data-url="{% url 'eliminar_carrito' item.key %}" 
+                                                data-key="{{ item.key }}"
+                                                data-agotado="{% if not item.producto.esta_disponible %}true{% else %}false{% endif %}"
+                                                title="Eliminar ítem completo">
+                                                    <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                            
                                         </td>
                                     </tr>
                                 {% endfor %}
@@ -193,8 +194,10 @@
                     <a href="{% url 'menu' %}" class="btn btn-outline-dark">
                         <i class="fas fa-arrow-left me-2"></i> Seguir pidiendo
                     </a>
-                    <a href="#" id="btn-limpiar-carrito" class="btn btn-outline-secondary">
-                        <i class="fas fa-broom me-1"></i> Vaciar todo
+                    <a href="javascript:void(0)" 
+                    id="btn-limpiar-carrito" 
+                    class="btn btn-outline-secondary" 
+                    data-url="{% url 'limpiar_carrito' %}"> <i class="fas fa-broom me-1"></i> Vaciar todo
                     </a>
                 </div>
             </div>
@@ -312,7 +315,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 3. VACIAR TODO
+    // 3. VACIAR TODO (CORREGIDO PARA USAR POST)
     const btnLimpiar = document.getElementById('btn-limpiar-carrito');
     if (btnLimpiar) {
         btnLimpiar.addEventListener('click', function(e) {
@@ -329,23 +332,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 reverseButtons: true
             }).then((result) => {
                 if (result.isConfirmed) {
-                    window.location.href = limpiarCarritoUrl;
+                    // En lugar de window.location, usamos nuestra función AJAX
+                    // Le pasamos un objeto simulado que contenga la URL
+                    procesarPeticion(btnLimpiar);
                 }
             });
         });
     }
 
-    // 4. PETICIÓN AJAX
+    // 4. PETICIÓN AJAX (EXTENDIDA PARA VACIAR)
     function procesarPeticion(btnElement) {
         const originalText = btnElement.innerHTML;
         btnElement.disabled = true;
         btnElement.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>`;
 
-        const url = btnElement.getAttribute('data-url');
+        // Si es el botón de limpiar, usamos limpiarCarritoUrl, si no, el data-url del botón
+        const url = btnElement.id === 'btn-limpiar-carrito' ? limpiarCarritoUrl : btnElement.getAttribute('data-url');
         const itemKey = btnElement.getAttribute('data-key');
-
+        
         fetch(url, {
-            method: 'GET',
+            method: 'POST',
             headers: { 
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRFToken': '{{ csrf_token }}'
@@ -357,7 +363,12 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(data => {
             if (data.status === 'ok') {
-                actualizarUI(data, itemKey);
+                // Si la respuesta indica que se vació todo el carrito
+                if (btnElement.id === 'btn-limpiar-carrito') {
+                    location.reload(); // Recargamos para mostrar la vista de "Carrito Vacío"
+                } else {
+                    actualizarUI(data, itemKey);
+                }
             }
             else if (data.status === 'error') {
                 Swal.fire({
@@ -385,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 5. ACTUALIZAR UI
+    // 5. ACTUALIZAR UI (MANTIENE TU LÓGICA ORIGINAL)
     function actualizarUI(data, itemKey) {
         const badgeItems = document.getElementById('badge-total-items');
         const cartCountNav = document.getElementById('cart-count');
@@ -417,35 +428,31 @@ document.addEventListener('DOMContentLoaded', function () {
             if (subtotalSpan) subtotalSpan.innerText = formatNumber(data.subtotal);
         }
 
+        // Lógica de agotados (sin cambios)
         if (typeof data.hay_agotados !== 'undefined') {
             const alerta = document.getElementById('alerta-agotados');
             const btnPago = document.getElementById('checkout-button');
 
             if (data.hay_agotados === false) {
                 if (alerta) alerta.style.display = 'none';
-                if (btnPago) {
-                    if (btnPago.tagName === 'BUTTON') {
-                        const newBtn = document.createElement('a');
-                        newBtn.id = 'checkout-button';
-                        newBtn.href = checkoutUrl;
-                        newBtn.className = 'btn btn-success btn-lg py-3 shadow-sm fw-bold';
-                        newBtn.style.width = '100%';
-                        newBtn.innerHTML = `PAGAR AHORA <i class="fas fa-chevron-right ms-2"></i>`;
-                        btnPago.parentNode.replaceChild(newBtn, btnPago);
-                    }
+                if (btnPago && btnPago.tagName === 'BUTTON') {
+                    const newBtn = document.createElement('a');
+                    newBtn.id = 'checkout-button';
+                    newBtn.href = checkoutUrl;
+                    newBtn.className = 'btn btn-success btn-lg py-3 shadow-sm fw-bold w-100';
+                    newBtn.innerHTML = `PAGAR AHORA <i class="fas fa-chevron-right ms-2"></i>`;
+                    btnPago.parentNode.replaceChild(newBtn, btnPago);
                 }
             } else {
                 if (alerta) alerta.style.display = 'block';
-                if (btnPago) {
-                    if (btnPago.tagName === 'A') {
-                        const newBtn = document.createElement('button');
-                        newBtn.id = 'checkout-button';
-                        newBtn.className = 'btn btn-secondary btn-lg py-3 fw-bold disabled';
-                        newBtn.disabled = true;
-                        newBtn.style.cssText = 'cursor: not-allowed; width: 100%;';
-                        newBtn.innerHTML = `PAGAR AHORA <i class="fas fa-lock ms-2"></i>`;
-                        btnPago.parentNode.replaceChild(newBtn, btnPago);
-                    }
+                if (btnPago && btnPago.tagName === 'A') {
+                    const newBtn = document.createElement('button');
+                    newBtn.id = 'checkout-button';
+                    newBtn.className = 'btn btn-secondary btn-lg py-3 fw-bold disabled w-100';
+                    newBtn.disabled = true;
+                    newBtn.style.cursor = 'not-allowed';
+                    newBtn.innerHTML = `PAGAR AHORA <i class="fas fa-lock ms-2"></i>`;
+                    btnPago.parentNode.replaceChild(newBtn, btnPago);
                 }
             }
         }

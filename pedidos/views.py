@@ -8,6 +8,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from decimal import Decimal 
 from django.template.loader import render_to_string 
 import json 
+from django.views.decorators.http import require_POST
 
 # --- FUNCIONES AUXILIARES ---
 
@@ -134,73 +135,86 @@ def modal_opciones(request, variante_id):
 
 
 def agregar_carrito(request, variante_id):
+    # 1. Validación de Cantidad
+    try:
+        cantidad = int(request.POST.get('cantidad', 1))
+    except (ValueError, TypeError):
+        cantidad = 1
+
+    if cantidad > 10:
+        return JsonResponse({'status': 'error', 'message': 'Cantidad excesiva (máx 10).'})
+    if cantidad <= 0:
+        return JsonResponse({'status': 'error', 'message': 'La cantidad debe ser mayor a 0.'})
+
     carrito = Carrito(request)
     variante = get_object_or_404(Variante, id=variante_id)
 
     if not variante.esta_disponible:
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'status': 'error','message': '¡Lo sentimos! Esta opción ya no está disponible.'})
-        return redirect('menu')
+        # En lugar de preguntar si es XMLHttpRequest, devolvemos error siempre
+        # porque esta vista es para una acción de botón
+        return JsonResponse({'status': 'error', 'message': 'No disponible'}, status=400)
 
     if request.method == 'POST':
-        # --- BLINDAJE DE SEGURIDAD: VALIDACIÓN DE OBLIGATORIOS ---
-        # Verificamos qué grupos son realmente obligatorios en la DB para esta variante
+        # --- VALIDACIÓN DE OBLIGATORIOS ---
         grupos_obligatorios = variante.grupos_opciones.filter(obligatorio=True, activo=True)
-        
         for grupo in grupos_obligatorios:
             field_name = f'grupo_{grupo.id}'
-            # Si el ID del grupo no está en el POST o no tiene valor seleccionado
-            if field_name not in request.POST or not request.POST.get(field_name):
-                mensaje_error = f'Debes seleccionar una opción para: {grupo.nombre}'
-                if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                    return JsonResponse({'status': 'error', 'message': mensaje_error})
-                return redirect('menu')
+            if not request.POST.get(field_name):
+                # CAMBIO: Siempre devolver JSON si falta algo
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': f'Debes seleccionar: {grupo.nombre}'
+                }, status=400)
 
-        # 1. Recopilar opciones seleccionadas
-        opciones_seleccionadas = []
+        # 3. Recopilar y Validar Opciones
+        opciones_ids = []
         for key in request.POST:
             if key.startswith('grupo_'):
                 valores = request.POST.getlist(key)
                 for val in valores:
-                    try:
-                        opciones_seleccionadas.append(int(val))
-                    except (ValueError, TypeError):
-                        continue
+                    if val.isdigit(): # Validación rápida antes de convertir
+                        opciones_ids.append(int(val))
         
-        notas = request.POST.get('notas', '').strip()
+        notas = request.POST.get('notas', '').strip()[:200]
         
-        # 2. CÁLCULO DE PRECIO FINAL (Inmune a hacks de cliente)
+        # 4. Cálculo de Precio (Lado del Servidor)
         precio_final = variante.precio 
-        if opciones_seleccionadas:
-            resultado = Opcion.objects.filter(
-                id__in=opciones_seleccionadas,
-                activo=True
-            ).aggregate(total_extra=models.Sum('precio_extra'))
-            
-            opciones_extras = resultado.get('total_extra')
-            if opciones_extras:
-                precio_final += opciones_extras
         
-        # 3. AGREGAR AL CARRITO
+        if opciones_ids:
+            opciones_validas = Opcion.objects.filter(
+                id__in=opciones_ids,
+                grupo__variante=variante,
+                activo=True
+            )
+            
+            # Verificación de integridad de IDs
+            if opciones_validas.count() != len(set(opciones_ids)):
+                return JsonResponse({'status': 'error', 'message': 'Selección de opciones no válida.'})
+
+            extra = opciones_validas.aggregate(total=models.Sum('precio_extra'))['total'] or 0
+            precio_final += extra
+        
+        # 5. AGREGAR AL CARRITO (¡Aquí se usa la cantidad!)
         carrito.agregar(
             variante_id=variante.id, 
+            cantidad=cantidad,           # <--- FALTABA ESTO
             precio_unitario=precio_final, 
-            opciones_ids=opciones_seleccionadas, 
+            opciones_ids=opciones_ids, 
             notas=notas
         )
 
+    # 6. Respuesta AJAX
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        item_count = carrito.get_cantidad_de_variante(variante.id)
-        html_ticket = render_to_string('pedidos/carrito_sidebar.html', {'carrito': carrito}, request=request)
         return JsonResponse({
             'status': 'ok',
             'cant_total': carrito.get_total_items(),
-            'html_ticket': html_ticket,
-            'cant_producto': item_count,
+            'html_ticket': render_to_string('pedidos/carrito_sidebar.html', {'carrito': carrito}, request=request),
+            'cant_producto': carrito.get_cantidad_de_variante(variante.id),
             'variante_id': variante.id
         })
 
     return redirect('menu')
+
 
 def ver_carrito(request):
     """Vista de detalle del carrito."""
@@ -212,7 +226,7 @@ def ver_carrito(request):
         'hay_agotados': hay_agotados
     })
 
-
+@require_POST
 def sumar_plato(request, item_key):
     carrito = Carrito(request)
     item_data = carrito.carrito.get(item_key)
@@ -257,7 +271,7 @@ def sumar_plato(request, item_key):
         })
     return redirect('ver_carrito')
 
-
+@require_POST
 def restar_plato(request, item_key):
     carrito = Carrito(request)
     item_antes = carrito.carrito.get(item_key)
@@ -298,7 +312,7 @@ def restar_plato(request, item_key):
         })
     return redirect('ver_carrito')
 
-
+@require_POST
 def eliminar_carrito(request, item_key):
     carrito = Carrito(request)
     item = carrito.carrito.get(item_key)
@@ -333,11 +347,16 @@ def eliminar_carrito(request, item_key):
     return redirect('ver_carrito')
 
 
-
+@require_POST
 def limpiar_carrito(request):
     carrito = Carrito(request)
     carrito.limpiar()
-    return redirect('menu')
+    
+    # En lugar de redirect, enviamos una señal de éxito en JSON
+    return JsonResponse({
+        'status': 'ok',
+        'message': 'Carrito vaciado correctamente'
+    })
 
 @staff_member_required 
 def toggle_variante_status(request, variante_id):

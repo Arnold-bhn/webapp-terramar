@@ -207,42 +207,80 @@
             });
         }
 
+        
         function conectarFormularioAjax(form) {
-            form.addEventListener('submit', function (e) {
-                e.preventDefault();
-                const btn = this.querySelector('button[type="submit"]');
-                btn.disabled = true;
-                fetch(this.action, {
-                    method: 'POST',
-                    body: new FormData(this),
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'ok') {
-                        // Cerramos el modal si existe la instancia
-                        if (modalBS) modalBS.hide();
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const btn = this.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        
+        fetch(this.action, {
+            method: 'POST',
+            body: new FormData(this),
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Error en el servidor');
+            return response.json(); // Solo un .json() aquí
+        })
+        .then(data => {
+            if (data.status === 'ok') {
+                // 1. Cerrar el modal
+                if (modalBS) modalBS.hide();
 
-                        document.getElementById('ticket-fijo-content').innerHTML = data.html_ticket;
-                        const cartCount = document.getElementById('cart-count');
-                        if (cartCount) { cartCount.innerText = data.cant_total; cartCount.classList.remove('d-none'); }
-                        
-                        if(data.variante_id) {
-                            const badgeNegro = document.getElementById(`badge-${data.variante_id}`);
-                            if (badgeNegro) {
-                                badgeNegro.innerText = data.cant_producto;
-                                badgeNegro.classList.remove('d-none');
-                                badgeNegro.classList.add('bg-dark');
-                            }
-                        }
-                        actualizarVistaColumnas();
-                        const toastEl = document.getElementById('liveToast');
-                        if (toastEl) new bootstrap.Toast(toastEl).show();
+                // 2. Actualizar el contenido del ticket lateral
+                const ticketContainer = document.getElementById('ticket-fijo-content');
+                // IMPORTANTE: Tu vista debe devolver 'html_ticket' o 'html_sidebar'
+                if (ticketContainer && (data.html_ticket || data.html_sidebar)) {
+                    ticketContainer.innerHTML = data.html_ticket || data.html_sidebar;
+                }
+
+                // 3. Actualizar el contador global (Navbar)
+                const cartCount = document.getElementById('cart-count');
+                if (cartCount) {
+                    // Usamos total_items para ser consistentes con el resto de tu código
+                    const total = data.total_items || data.cant_total;
+                    cartCount.innerText = total; 
+                    total > 0 ? cartCount.classList.remove('d-none') : cartCount.classList.add('d-none');
+                }
+                
+                // 4. Actualizar el badge del plato (el número sobre la foto)
+                if(data.variante_id) {
+                    const badgeNegro = document.getElementById(`badge-${data.variante_id}`);
+                    if (badgeNegro) {
+                        badgeNegro.innerText = data.cant_producto;
+                        badgeNegro.classList.remove('d-none');
+                        badgeNegro.classList.add('bg-dark');
                     }
-                })
-                .finally(() => btn.disabled = false);
-            });
-        }
+                }
+
+                // 5. Refrescar columnas y mostrar aviso
+                actualizarVistaColumnas();
+                const toastEl = document.getElementById('liveToast');
+                if (toastEl) new bootstrap.Toast(toastEl).show();
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: '¡Atención!',
+                    text: data.message || "Hubo un problema al agregar al pedido",
+                    confirmButtonText: 'Entendido',
+                    confirmButtonColor: '#0d6efd', // El color azul de tu botón
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            btn.disabled = false;
+        });
+    });
+}
+
+
 
         // Mantener las demás funciones (activarFormulariosDirectos, eliminarItem, btn-update) intactas
         function activarFormulariosDirectos() {
@@ -261,52 +299,120 @@
             actualizarVistaColumnas();
         });
 
-        function eliminarItem(event, elemento) {
-            event.preventDefault();
-            const url = elemento.dataset.url;
-            const ticketContainer = document.getElementById('ticket-fijo-content');
-            if(ticketContainer) ticketContainer.style.opacity = '0.5';
-            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    ticketContainer.style.opacity = '1';
-                    ticketContainer.innerHTML = data.html_ticket;
-                    const cartCount = document.getElementById('cart-count');
-                    if(cartCount) {
-                        cartCount.innerText = data.cant_total;
-                        data.cant_total > 0 ? cartCount.classList.remove('d-none') : cartCount.classList.add('d-none');
-                    }
-                    if (data.carrito_data) actualizarBadgesMarca(data.carrito_data);
-                    actualizarVistaColumnas();
-                }
-            });
-        }
+        
+    function eliminarItem(event, elemento) {
+    event.preventDefault(); // Bloquea cualquier acción por defecto
+    
+    const url = elemento.dataset.url;
+    const ticketContainer = document.getElementById('ticket-fijo-content');
+    
+    if(ticketContainer) ticketContainer.style.opacity = '1';
 
-        document.addEventListener('click', function(e) {
-            const btn = e.target.closest('.btn-update');
-            if (!btn) return;
-            e.preventDefault();
-            const url = btn.getAttribute('data-url');
-            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    const contenedorTicket = document.getElementById('ticket-fijo-content');
-                    if (contenedorTicket && data.html_ticket) { contenedorTicket.innerHTML = data.html_ticket; }
-                    const badgeNegro = document.getElementById(`badge-${data.variante_id}`);
-                    if (badgeNegro) {
-                        badgeNegro.innerText = data.cant_producto;
-                        parseInt(data.cant_producto) > 0 ? badgeNegro.classList.remove('d-none') : badgeNegro.classList.add('d-none');
-                    }
-                    const cartCount = document.getElementById('cart-count');
-                    if(cartCount) {
-                        cartCount.innerText = data.total_items;
-                        data.total_items > 0 ? cartCount.classList.remove('d-none') : cartCount.classList.add('d-none');
-                    }
+    // MODIFICACIÓN DE SEGURIDAD:
+    fetch(url, { 
+        method: 'POST', // Obligatorio para @require_POST
+        headers: { 
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': '{{ csrf_token }}' // Obligatorio para POST en Django
+        } 
+    })
+    .then(r => {
+        if (!r.ok) throw new Error('Error al eliminar');
+        return r.json();
+    })
+    .then(data => {
+        if (data.status === 'ok') {
+            if(ticketContainer) {
+                ticketContainer.style.opacity = '1';
+                // Usamos el HTML que nos envíe la vista (sidebar o ticket)
+                ticketContainer.innerHTML = data.html_ticket || data.html_sidebar;
+            }
+
+            // Actualizar el contador del Navbar
+            const cartCount = document.getElementById('cart-count');
+            if(cartCount) {
+                const total = data.total_items || data.cant_total;
+                cartCount.innerText = total;
+                total > 0 ? cartCount.classList.remove('d-none') : cartCount.classList.add('d-none');
+            }
+
+            // Actualizar los badges de las fotos (para que el número desaparezca)
+            if (data.carrito_data) {
+                actualizarBadgesMarca(data.carrito_data);
+            } else if (data.variante_id) {
+                // Si la vista solo envía el ID del que borramos, lo ocultamos
+                const badge = document.getElementById(`badge-${data.variante_id}`);
+                if (badge) badge.classList.add('d-none');
+            }
+
+            actualizarVistaColumnas();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        if(ticketContainer) ticketContainer.style.opacity = '1';
+    });
+}
+    
+        
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-update');
+        if (!btn) return;
+        
+        e.preventDefault();
+        const url = btn.getAttribute('data-url');
+
+        // MODIFICACIÓN: Agregamos método y headers de seguridad
+        fetch(url, { 
+            method: 'POST', // 1. Forzamos POST para que @require_POST no lo rechace
+            headers: { 
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}' // 2. Enviamos el token de seguridad de Django
+            } 
+        })
+        .then(r => {
+            if (!r.ok) throw new Error('Error en el servidor');
+            return r.json();
+        })
+        .then(data => {
+            if (data.status === 'ok') {
+                // Actualizar Contenido del Ticket/Carrito
+                const contenedorTicket = document.getElementById('ticket-fijo-content');
+                if (contenedorTicket && data.html_ticket) { 
+                    contenedorTicket.innerHTML = data.html_ticket; 
+                }
+
+                // OPCIONAL: Si tu vista también envía 'html_sidebar', actualízalo aquí
+                const sidebar = document.getElementById('sidebar-carrito');
+                if (sidebar && data.html_sidebar) {
+                    sidebar.innerHTML = data.html_sidebar;
+                }
+
+                // Actualizar Badge del plato específico (el numerito negro)
+                const badgeNegro = document.getElementById(`badge-${data.variante_id}`);
+                if (badgeNegro) {
+                    badgeNegro.innerText = data.cant_producto;
+                    parseInt(data.cant_producto) > 0 ? badgeNegro.classList.remove('d-none') : badgeNegro.classList.add('d-none');
+                }
+
+                // Actualizar Contador Global del Carrito (Navbar)
+                const cartCount = document.getElementById('cart-count');
+                if(cartCount) {
+                    cartCount.innerText = data.total_items;
+                    data.total_items > 0 ? cartCount.classList.remove('d-none') : cartCount.classList.add('d-none');
+                }
+
+                // Ejecutar tu función de layout si existe
+                if (typeof actualizarVistaColumnas === "function") {
                     actualizarVistaColumnas();
                 }
-            });
-        });
+            }
+        })
+        .catch(error => console.error('Error en la petición:', error));
+    });
+
+
+
     </script>
 {% endblock %}

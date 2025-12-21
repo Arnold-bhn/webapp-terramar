@@ -35,7 +35,7 @@
 
                             <div class="card-body">
                                 <h5 class="card-title fw-bold text-dark">{{ plato.nombre }}</h5>
-                                <p class="card-text text-muted small">{{ plato.descripcion|truncatechars:60 }}</p>
+                                <p class="card-text text-muted small">{{ plato.descripcion }}</p>
                                 
                                 <div class="mt-3">
                                     {% for variante in plato.variantes.all %}
